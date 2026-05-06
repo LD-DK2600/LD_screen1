@@ -17,8 +17,6 @@
       --room-occupied: #ff6b6b;
       --room-available: #5fdb9d;
       --room-pending: #ffd76a;
-      --lamp-on: #ffd76a;
-      --lamp-off: #333b4d;
       --border-color: #2a3449;
       --font-family: "Inter", "Segoe UI", Arial, sans-serif;
       --header-height: auto;
@@ -116,27 +114,6 @@
       max-height: 96%;
       object-fit: contain;
       border-radius: 12px;
-    }
-
-    .clickable-area {
-      position: absolute;
-      border-radius: 50%;
-      pointer-events: none;
-      transition: all 0.25s ease;
-    }
-
-    #lamp-studio-1 {
-      top: 35%;
-      left: 30%;
-      width: 1.7vw;
-      height: 1.7vw;
-    }
-
-    #lamp-studio-2 {
-      top: 35%;
-      left: 60%;
-      width: 1.7vw;
-      height: 1.7vw;
     }
 
     footer {
@@ -283,13 +260,7 @@
 
   <main>
     <div class="studio-visual">
-      <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" usemap="#studio-map">
-      <map name="studio-map">
-        <area shape="circle" coords="300,200,50" href="#" alt="Studio 1" id="area-studio-1" data-room-id="studio-1">
-        <area shape="circle" coords="700,200,50" href="#" alt="Studio 2" id="area-studio-2" data-room-id="studio-2">
-      </map>
-      <div class="clickable-area" id="lamp-studio-1" data-room-id="studio-1"></div>
-      <div class="clickable-area" id="lamp-studio-2" data-room-id="studio-2"></div>
+      <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout">
     </div>
 
   </main>
@@ -421,37 +392,6 @@
       return date.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
     }
 
-    function isNow(start, end) {
-      const now = new Date();
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-      return now >= startDate && now < endDate;
-    }
-
-    function isToday(dateString) {
-      const today = new Date();
-      const date = new Date(dateString);
-      return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
-    }
-
-    function status(room, bookings) {
-      const now = new Date();
-      const currentBooking = bookings.find((b) => b.room_id === room.id && isNow(b.start_time, b.end_time));
-      if (currentBooking) {
-        return { status: "occupied", time: `${fmt(currentBooking.start_time)} - ${fmt(currentBooking.end_time)}` };
-      }
-
-      const nextBooking = bookings
-        .filter((b) => b.room_id === room.id && new Date(b.start_time) > now)
-        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0];
-
-      if (nextBooking && isToday(nextBooking.start_time)) {
-        return { status: "pending", time: `${fmt(nextBooking.start_time)} - ${fmt(nextBooking.end_time)}` };
-      }
-
-      return { status: "available", time: "Ledig" };
-    }
-
     async function render() {
       const { rooms, bookings } = await initSupabase();
       const upcomingBookingsList = document.getElementById("upcoming-bookings-list");
@@ -466,20 +406,6 @@
       const relevantBookings = bookings.filter((b) => {
         const bookingDate = new Date(b.start_time);
         return bookingDate >= today && bookingDate < tomorrow;
-      });
-
-      rooms.forEach((room) => {
-        const roomStatusData = status(room, bookings);
-        const lamp = document.getElementById(`lamp-${room.id}`);
-        if (lamp) {
-          if (roomStatusData.status === "occupied") {
-            lamp.style.backgroundColor = "var(--lamp-on)";
-            lamp.style.boxShadow = "0 0 15px var(--lamp-on)";
-          } else {
-            lamp.style.backgroundColor = "var(--lamp-off)";
-            lamp.style.boxShadow = "none";
-          }
-        }
       });
 
       rooms.forEach((room) => {

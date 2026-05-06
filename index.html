@@ -6,7 +6,7 @@
   <title>LD Studios infoskærm dashboard</title>
   <link rel="preload" href="01Logo_white_HIGH.png" as="image">
   <link rel="preload" href="LDstudiiosmap.png" as="image">
-  <link rel="preload" href="slideshow-opt/IMG_0592.jpg" as="image" fetchpriority="high">
+  <link rel="preload" href="slideshow-opt/ld-slide-01.jpg" as="image" fetchpriority="high">
   <style>
     :root {
       --bg-color: #080b11;
@@ -357,7 +357,7 @@
           id="slideshow-main"
           class="slideshow-img"
           alt="LD Studios billeder"
-          src="slideshow-opt/IMG_0592.jpg"
+          src="slideshow-opt/ld-slide-01.jpg"
           width="800"
           height="600"
           loading="eager"
@@ -385,12 +385,12 @@
       { id: "studio-3", name: "Studie 3" },
       { id: "studio-4", name: "Studie 4" }
     ];
-    /** URL-friendly filnavne (uden mellemrum) — matcher repo under slideshow-opt/ */
+    /** Ingen "IMG_"-præfiks (filter/kiosk) + re-eksporteret RGB-JPEG uden EXIF. */
     const SLIDESHOW_URLS = [
-      "slideshow-opt/IMG_0592.jpg",
-      "slideshow-opt/IMG_1433.jpg",
-      "slideshow-opt/IMG_1540.jpg",
-      "slideshow-opt/IMG_4505-1.jpg",
+      "slideshow-opt/ld-slide-01.jpg",
+      "slideshow-opt/ld-slide-02.jpg",
+      "slideshow-opt/ld-slide-03.jpg",
+      "slideshow-opt/ld-slide-04.jpg",
       "slideshow-opt/LD-table-mics.jpg",
       "slideshow-opt/Stage1.jpg",
       "slideshow-opt/stream-3.jpg"

@@ -177,6 +177,42 @@
       border-radius: 18px;
       background: linear-gradient(165deg, rgba(27, 34, 52, 0.55), rgba(16, 23, 37, 0.55));
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slideshow-frame {
+      position: absolute;
+      inset: 0;
+      padding: 0.8vw;
+    }
+
+    .slide-image {
+      position: absolute;
+      inset: 0.8vw;
+      width: calc(100% - 1.6vw);
+      height: calc(100% - 1.6vw);
+      object-fit: contain;
+      object-position: center center;
+      border-radius: 12px;
+      opacity: 0;
+      transition: opacity 0.9s ease-in-out;
+      pointer-events: none;
+    }
+
+    .slide-image.active {
+      opacity: 1;
+    }
+
+    .slideshow-empty {
+      color: #8ea0c8;
+      font-size: 0.95vw;
+      letter-spacing: 0.02em;
+      text-align: center;
+      padding: 1vw;
     }
 
     footer {
@@ -298,6 +334,21 @@
         min-height: 12vh;
       }
 
+      .slideshow-frame {
+        padding: 2vw;
+      }
+
+      .slide-image {
+        inset: 2vw;
+        width: calc(100% - 4vw);
+        height: calc(100% - 4vw);
+      }
+
+      .slideshow-empty {
+        font-size: 2.8vw;
+        padding: 2vw;
+      }
+
       footer {
         padding: 3vw;
         margin: 0 3vw 3vw;
@@ -346,7 +397,10 @@
         <div class="entry-diode" aria-hidden="true"></div>
       </div>
     </div>
-    <div class="side-empty-box" aria-label="Tom informationsboks"></div>
+    <div class="side-empty-box" aria-label="Billedslideshow">
+      <div class="slideshow-frame" id="slideshow-frame"></div>
+      <div class="slideshow-empty" id="slideshow-empty">Tilføj billeder til slideshow...</div>
+    </div>
 
   </main>
 
@@ -366,6 +420,17 @@
       { id: "studio-3", name: "Studie 3" },
       { id: "studio-4", name: "Studie 4" }
     ];
+    const SLIDESHOW_SOURCES = [
+      "slideshow/slide-01.jpg",
+      "slideshow/slide-02.jpg",
+      "slideshow/slide-03.jpg",
+      "slideshow/slide-04.jpg",
+      "slideshow/slide-05.jpg",
+      "slideshow/slide-06.jpg"
+    ];
+
+    let slideshowIndex = 0;
+    let slideshowTimer = null;
 
     async function initSupabase() {
       if (BRUGE_SUPABASE) {
@@ -538,8 +603,59 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      initSlideshow();
       clock();
     });
+
+    function initSlideshow() {
+      const frame = document.getElementById("slideshow-frame");
+      const empty = document.getElementById("slideshow-empty");
+      if (!frame || !empty) return;
+
+      const loadedSlides = [];
+      let pending = SLIDESHOW_SOURCES.length;
+
+      if (!pending) return;
+
+      const finalize = () => {
+        if (!loadedSlides.length) {
+          empty.style.display = "block";
+          return;
+        }
+
+        empty.style.display = "none";
+        loadedSlides.forEach((img, idx) => {
+          if (idx === 0) img.classList.add("active");
+          frame.appendChild(img);
+        });
+
+        if (loadedSlides.length === 1) return;
+
+        slideshowTimer = setInterval(() => {
+          const slides = frame.querySelectorAll(".slide-image");
+          if (!slides.length) return;
+          slides[slideshowIndex].classList.remove("active");
+          slideshowIndex = (slideshowIndex + 1) % slides.length;
+          slides[slideshowIndex].classList.add("active");
+        }, 5000);
+      };
+
+      SLIDESHOW_SOURCES.forEach((src) => {
+        const img = new Image();
+        img.className = "slide-image";
+        img.alt = "LD Studios billede";
+        img.onload = () => {
+          loadedSlides.push(img);
+          pending -= 1;
+          if (!pending) finalize();
+        };
+        img.onerror = () => {
+          pending -= 1;
+          if (!pending) finalize();
+        };
+        img.src = src;
+      });
+    }
   </script>
 </body>
 </html>

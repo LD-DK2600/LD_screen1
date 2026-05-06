@@ -396,6 +396,16 @@
       "slideshow-opt/stream-3.jpg"
     ];
     const SLIDE_INTERVAL_MS = 5000;
+    /** Én klient til hele fanen — undgår "Multiple GoTrueClient instances"-advarslen. */
+    let supabaseClientSingleton = null;
+
+    function getSupabaseClient() {
+      if (!supabaseClientSingleton && window.supabase && typeof window.supabase.createClient === "function") {
+        supabaseClientSingleton = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+      return supabaseClientSingleton;
+    }
+
     async function initSupabase() {
       if (BRUGE_SUPABASE) {
         try {
@@ -410,7 +420,10 @@
     }
 
     async function getLiveSupabaseData() {
-      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error("Supabase SDK ikke tilgængelig");
+      }
 
       const { data: studios, error: studiosError } = await client
         .from("Studio")

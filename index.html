@@ -147,12 +147,7 @@
       align-self: stretch;
     }
 
-    /*
-      Slideshow: ren CSS — ét billede ad gangen, 5s pr. billede, 7 billeder = 35s cyklus.
-      Ingen JS-timing (undgår kiosk/async/lag-problemer). Skift = hårde keyframes.
-      100/7 ≈ 14.285714% pr. segment.
-    */
-    .slideshow-frame.css-slideshow {
+    .slideshow-frame {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -161,7 +156,7 @@
       background: radial-gradient(ellipse at center, rgba(42, 54, 82, 0.5) 0%, rgba(16, 23, 37, 0.85) 100%);
     }
 
-    .css-slideshow img {
+    .slideshow-img {
       position: absolute;
       left: 0;
       top: 0;
@@ -171,53 +166,23 @@
       object-position: center center;
       border-radius: 16px;
       pointer-events: none;
-      opacity: 0;
-      z-index: 1;
-      animation-duration: 35s;
-      animation-iteration-count: infinite;
-      animation-timing-function: linear;
     }
 
-    .css-slideshow img:nth-child(1) { animation-name: css-slideshow-0; }
-    .css-slideshow img:nth-child(2) { animation-name: css-slideshow-1; }
-    .css-slideshow img:nth-child(3) { animation-name: css-slideshow-2; }
-    .css-slideshow img:nth-child(4) { animation-name: css-slideshow-3; }
-    .css-slideshow img:nth-child(5) { animation-name: css-slideshow-4; }
-    .css-slideshow img:nth-child(6) { animation-name: css-slideshow-5; }
-    .css-slideshow img:nth-child(7) { animation-name: css-slideshow-6; }
-
-    @keyframes css-slideshow-0 {
-      0%, 14.285714% { opacity: 1; z-index: 2; }
-      14.285715%, 100% { opacity: 0; z-index: 1; }
-    }
-    @keyframes css-slideshow-1 {
-      0%, 14.285714% { opacity: 0; z-index: 1; }
-      14.285715%, 28.571428% { opacity: 1; z-index: 2; }
-      28.571429%, 100% { opacity: 0; z-index: 1; }
-    }
-    @keyframes css-slideshow-2 {
-      0%, 28.571428% { opacity: 0; z-index: 1; }
-      28.571429%, 42.857142% { opacity: 1; z-index: 2; }
-      42.857143%, 100% { opacity: 0; z-index: 1; }
-    }
-    @keyframes css-slideshow-3 {
-      0%, 42.857142% { opacity: 0; z-index: 1; }
-      42.857143%, 57.142857% { opacity: 1; z-index: 2; }
-      57.142858%, 100% { opacity: 0; z-index: 1; }
-    }
-    @keyframes css-slideshow-4 {
-      0%, 57.142857% { opacity: 0; z-index: 1; }
-      57.142858%, 71.428571% { opacity: 1; z-index: 2; }
-      71.428572%, 100% { opacity: 0; z-index: 1; }
-    }
-    @keyframes css-slideshow-5 {
-      0%, 71.428571% { opacity: 0; z-index: 1; }
-      71.428572%, 85.714285% { opacity: 1; z-index: 2; }
-      85.714286%, 100% { opacity: 0; z-index: 1; }
-    }
-    @keyframes css-slideshow-6 {
-      0%, 85.714285% { opacity: 0; z-index: 1; }
-      85.714286%, 100% { opacity: 1; z-index: 2; }
+    .slideshow-status {
+      position: absolute;
+      bottom: 0.5vw;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      margin: 0;
+      font-size: 0.72vw;
+      color: #c9d5f5;
+      background: rgba(6, 10, 18, 0.65);
+      padding: 0.3em 0.75em;
+      border-radius: 8px;
+      max-width: 92%;
+      text-align: center;
+      line-height: 1.35;
     }
 
     footer {
@@ -332,8 +297,13 @@
         min-height: 12vh;
       }
 
-      .css-slideshow img {
+      .slideshow-img {
         border-radius: 14px;
+      }
+
+      .slideshow-status {
+        font-size: 2.2vw;
+        bottom: 1.2vw;
       }
 
       footer {
@@ -382,14 +352,18 @@
       <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" fetchpriority="high" decoding="async">
     </div>
     <div class="side-empty-box" aria-label="Billedslideshow">
-      <div class="slideshow-frame css-slideshow" id="slideshow-frame">
-        <img alt="LD Studios" src="slideshow-opt/IMG_0592.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="high">
-        <img alt="" src="slideshow-opt/IMG_1433.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
-        <img alt="" src="slideshow-opt/IMG_1540.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
-        <img alt="" src="slideshow-opt/IMG_4505%20(1).jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
-        <img alt="" src="slideshow-opt/Podcast%201.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
-        <img alt="" src="slideshow-opt/Stage1.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
-        <img alt="" src="slideshow-opt/stream%203.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
+      <div class="slideshow-frame" id="slideshow-frame">
+        <img
+          id="slideshow-main"
+          class="slideshow-img"
+          alt="LD Studios billeder"
+          src="slideshow-opt/IMG_0592.jpg"
+          width="800"
+          height="600"
+          loading="eager"
+          decoding="async"
+          fetchpriority="high">
+        <p class="slideshow-status" id="slideshow-status" hidden></p>
       </div>
     </div>
 
@@ -411,6 +385,17 @@
       { id: "studio-3", name: "Studie 3" },
       { id: "studio-4", name: "Studie 4" }
     ];
+    /** URL-friendly filnavne (uden mellemrum) — matcher repo under slideshow-opt/ */
+    const SLIDESHOW_URLS = [
+      "slideshow-opt/IMG_0592.jpg",
+      "slideshow-opt/IMG_1433.jpg",
+      "slideshow-opt/IMG_1540.jpg",
+      "slideshow-opt/IMG_4505-1.jpg",
+      "slideshow-opt/Podcast-1.jpg",
+      "slideshow-opt/Stage1.jpg",
+      "slideshow-opt/stream-3.jpg"
+    ];
+    const SLIDE_INTERVAL_MS = 5000;
     async function initSupabase() {
       if (BRUGE_SUPABASE) {
         try {
@@ -581,9 +566,108 @@
       setTimeout(clock, 1000 * 30);
     }
 
+    function initSlideshow() {
+      const img = document.getElementById("slideshow-main");
+      const statusEl = document.getElementById("slideshow-status");
+      if (!img || SLIDESHOW_URLS.length === 0) return;
+
+      function showStatus(text) {
+        if (!statusEl) return;
+        statusEl.textContent = text;
+        statusEl.hidden = false;
+      }
+
+      function hideStatus() {
+        if (!statusEl) return;
+        statusEl.hidden = true;
+      }
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function probeUrl(url) {
+        return new Promise((resolve) => {
+          const p = new Image();
+          p.onload = () => resolve(p.naturalWidth > 0);
+          p.onerror = () => resolve(false);
+          p.src = url;
+        });
+      }
+
+      async function workingUrlsOnly() {
+        const checks = await Promise.all(
+          SLIDESHOW_URLS.map(async (url) => ({
+            url,
+            ok: await probeUrl(url)
+          }))
+        );
+
+        const good = checks.filter((c) => c.ok).map((c) => c.url);
+        const bad = checks.filter((c) => !c.ok).map((c) => c.url);
+        if (bad.length > 0) {
+          console.warn("Slideshow: disse billeder blev ikke fundet eller fejlet:", bad.join(", "));
+        }
+        return good;
+      }
+
+      function assignToMain(url) {
+        return new Promise((resolve) => {
+          let settled = false;
+          const finish = (ok) => {
+            if (settled) return;
+            settled = true;
+            img.onload = null;
+            img.onerror = null;
+            resolve(ok);
+          };
+
+          img.onload = () => finish(img.naturalWidth > 0);
+          img.onerror = () => finish(false);
+          img.src = url;
+          if (img.complete && img.naturalWidth > 0) finish(true);
+        });
+      }
+
+      (async () => {
+        const list = await workingUrlsOnly();
+        if (list.length === 0) {
+          showStatus("Ingen slideshow-billedefiler kunne hentes — tjek at slideshow-opt/ er uploadet korrekt.");
+          return;
+        }
+
+        const dropped = SLIDESHOW_URLS.length - list.length;
+        if (dropped > 0) {
+          showStatus(`${dropped} billede(r) blev sprunget over (fil findes ikke). Kører med ${list.length} filer — se også konsollen.`);
+        } else {
+          hideStatus();
+        }
+
+        let idx = 0;
+        await assignToMain(list[idx]);
+
+        while (true) {
+          await wait(SLIDE_INTERVAL_MS);
+          const startNext = (idx + 1) % list.length;
+          let progressed = false;
+          for (let step = 0; step < list.length; step += 1) {
+            const pick = (startNext + step) % list.length;
+            if (await assignToMain(list[pick])) {
+              idx = pick;
+              progressed = true;
+              break;
+            }
+          }
+          if (!progressed) await wait(2000);
+        }
+      })();
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
+      initSlideshow();
       clock();
     });
   </script>
 </body>
 </html>
+

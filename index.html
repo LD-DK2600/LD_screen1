@@ -145,18 +145,19 @@
       position: absolute;
       top: 20.7%;
       left: 49.4%;
-      width: 0.95vw;
-      height: 0.95vw;
-      min-width: 8px;
-      min-height: 8px;
-      max-width: 16px;
-      max-height: 16px;
+      width: 1.35vw;
+      height: 1.35vw;
+      min-width: 12px;
+      min-height: 12px;
+      max-width: 24px;
+      max-height: 24px;
       border-radius: 50%;
-      background: #ff3030;
-      border: 1px solid #ff8f8f;
-      box-shadow: 0 0 0 rgba(255, 48, 48, 0.9);
-      animation: diodeBlink 1.2s infinite ease-in-out;
+      background: radial-gradient(circle at 35% 35%, #ffd5d5 0%, #ff4b4b 35%, #d50000 100%);
+      border: 1px solid #ff9c9c;
+      box-shadow: 0 0 10px rgba(255, 48, 48, 0.9);
+      animation: diodeBlink 0.9s infinite ease-in-out;
       pointer-events: none;
+      z-index: 5;
     }
 
     @keyframes diodeBlink {
@@ -286,8 +287,10 @@
       }
 
       .entry-diode {
-        width: 2.3vw;
-        height: 2.3vw;
+        width: 3.2vw;
+        height: 3.2vw;
+        min-width: 14px;
+        min-height: 14px;
       }
 
       .side-empty-box {

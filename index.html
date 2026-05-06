@@ -123,17 +123,6 @@
       overflow: hidden;
     }
 
-    .floorplan-wrap {
-      position: relative;
-      width: fit-content;
-      height: fit-content;
-      max-width: 94%;
-      max-height: 94%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
     .studio-visual img {
       width: auto;
       height: auto;
@@ -142,37 +131,6 @@
       object-fit: contain;
       object-position: center center;
       border-radius: 12px;
-    }
-
-    .entry-diode {
-      position: absolute;
-      top: 20.7%;
-      left: 49.4%;
-      width: 1.35vw;
-      height: 1.35vw;
-      min-width: 12px;
-      min-height: 12px;
-      max-width: 24px;
-      max-height: 24px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #ffd5d5 0%, #ff4b4b 35%, #d50000 100%);
-      border: 1px solid #ff9c9c;
-      box-shadow: 0 0 10px rgba(255, 48, 48, 0.9);
-      animation: diodeBlink 0.9s infinite ease-in-out;
-      pointer-events: none;
-      z-index: 5;
-      transform: translateY(-350%);
-    }
-
-    @keyframes diodeBlink {
-      0%, 100% {
-        opacity: 0.4;
-        box-shadow: 0 0 4px rgba(255, 48, 48, 0.35);
-      }
-      50% {
-        opacity: 1;
-        box-shadow: 0 0 14px rgba(255, 48, 48, 0.95);
-      }
     }
 
     .side-empty-box {
@@ -202,7 +160,7 @@
       transform: translateY(-50%);
       border-radius: 16px;
       opacity: 0;
-      transition: opacity 0.9s ease-in-out;
+      transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
       pointer-events: none;
     }
 
@@ -326,13 +284,6 @@
         padding: 2vw;
       }
 
-      .entry-diode {
-        width: 3.2vw;
-        height: 3.2vw;
-        min-width: 14px;
-        min-height: 14px;
-      }
-
       .side-empty-box {
         min-height: 12vh;
       }
@@ -391,10 +342,7 @@
 
   <main>
     <div class="studio-visual">
-      <div class="floorplan-wrap">
-        <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" fetchpriority="high" decoding="async">
-        <div class="entry-diode" aria-hidden="true"></div>
-      </div>
+      <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" fetchpriority="high" decoding="async">
     </div>
     <div class="side-empty-box" aria-label="Billedslideshow">
       <div class="slideshow-frame" id="slideshow-frame"></div>

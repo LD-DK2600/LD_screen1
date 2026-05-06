@@ -391,7 +391,7 @@
       "slideshow-opt/IMG_1433.jpg",
       "slideshow-opt/IMG_1540.jpg",
       "slideshow-opt/IMG_4505-1.jpg",
-      "slideshow-opt/Podcast-1.jpg",
+      "slideshow-opt/LD-table-mics.jpg",
       "slideshow-opt/Stage1.jpg",
       "slideshow-opt/stream-3.jpg"
     ];
@@ -599,13 +599,18 @@
         return new Promise((resolve) => setTimeout(resolve, ms));
       }
 
-      function probeUrl(url) {
-        return new Promise((resolve) => {
-          const p = new Image();
-          p.onload = () => resolve(p.naturalWidth > 0);
-          p.onerror = () => resolve(false);
-          p.src = url;
-        });
+      async function probeUrl(url, attempts = 3) {
+        for (let i = 0; i < attempts; i += 1) {
+          const ok = await new Promise((resolve) => {
+            const p = new Image();
+            p.onload = () => resolve(p.naturalWidth > 0);
+            p.onerror = () => resolve(false);
+            p.src = url;
+          });
+          if (ok) return true;
+          if (i < attempts - 1) await wait(250);
+        }
+        return false;
       }
 
       async function workingUrlsOnly() {

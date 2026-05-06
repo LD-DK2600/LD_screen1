@@ -6,34 +6,44 @@
   <title>LD Studios infoskærm dashboard</title>
   <style>
     :root {
-      --bg-color: #000;
-      --text-color: #fff;
-      --primary-color: #2f94e0;
-      --secondary-color: #58c96d;
-      --tertiary-color: #ffc107;
-      --danger-color: #dc3545;
-      --room-occupied: #ff6347;
-      --room-available: #3cb371;
-      --room-pending: #ffd700;
-      --lamp-on: #ffd700;
-      --lamp-off: #333;
-      --border-color: #333;
-      --font-family: "Inter", sans-serif;
-      --header-height: 10vh;
-      --footer-height: 20vh;
-      --main-height: 70vh;
+      --bg-color: #080b11;
+      --surface-1: #111826;
+      --surface-2: #171f31;
+      --surface-3: #0d1320;
+      --text-color: #f5f7ff;
+      --muted-text: #a6b2ce;
+      --primary-color: #6cb7ff;
+      --secondary-color: #66e0a3;
+      --room-occupied: #ff6b6b;
+      --room-available: #5fdb9d;
+      --room-pending: #ffd76a;
+      --lamp-on: #ffd76a;
+      --lamp-off: #333b4d;
+      --border-color: #2a3449;
+      --font-family: "Inter", "Segoe UI", Arial, sans-serif;
+      --header-height: 11vh;
+      --footer-height: 22vh;
+      --main-height: 67vh;
+    }
+
+    * {
+      box-sizing: border-box;
     }
 
     body {
       margin: 0;
       padding: 0;
       font-family: var(--font-family);
-      background-color: var(--bg-color);
+      background:
+        radial-gradient(120% 100% at 10% -10%, #1f335b 0%, transparent 40%),
+        radial-gradient(120% 100% at 90% -15%, #2a214f 0%, transparent 35%),
+        var(--bg-color);
       color: var(--text-color);
       overflow: hidden;
       display: grid;
       grid-template-rows: var(--header-height) var(--main-height) var(--footer-height);
       height: 100vh;
+      letter-spacing: 0.01em;
     }
 
     header {
@@ -41,25 +51,36 @@
       justify-content: space-between;
       align-items: center;
       padding: 0 2vw;
-      background-color: var(--border-color);
+      background: linear-gradient(180deg, rgba(27, 37, 60, 0.92), rgba(14, 21, 35, 0.92));
+      border-bottom: 1px solid var(--border-color);
     }
 
     .logo {
-      height: 8vh;
+      height: 7vh;
+      max-width: 35vw;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
     }
 
     .datetime {
       text-align: right;
-      font-size: 2.5vw;
+      font-size: 2.3vw;
+      font-weight: 700;
+      line-height: 1.1;
     }
 
     .date {
-      font-size: 1.5vw;
-      opacity: 0.8;
+      margin-top: 0.35vw;
+      font-size: 1.25vw;
+      color: var(--muted-text);
+      font-weight: 500;
+      text-transform: capitalize;
     }
 
     main {
       display: flex;
+      gap: 1.2vw;
+      padding: 1.2vw;
     }
 
     .studio-visual {
@@ -68,105 +89,123 @@
       justify-content: center;
       align-items: center;
       position: relative;
+      background: linear-gradient(165deg, rgba(27, 34, 52, 0.9), rgba(16, 23, 37, 0.9));
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
     }
 
     .studio-visual img {
-      max-width: 95%;
-      max-height: 95%;
+      max-width: 96%;
+      max-height: 96%;
       object-fit: contain;
+      border-radius: 12px;
     }
 
     .clickable-area {
       position: absolute;
-      background-color: rgba(255, 0, 0, 0);
-      border: 1px solid rgba(0, 255, 0, 0);
-      cursor: pointer;
       border-radius: 50%;
+      pointer-events: none;
+      transition: all 0.25s ease;
     }
 
     #lamp-studio-1 {
       top: 35%;
       left: 30%;
-      width: 2vw;
-      height: 2vw;
+      width: 1.7vw;
+      height: 1.7vw;
     }
 
     #lamp-studio-2 {
       top: 35%;
       left: 60%;
-      width: 2vw;
-      height: 2vw;
+      width: 1.7vw;
+      height: 1.7vw;
     }
 
     .rooms-panel {
       flex: 1;
-      background-color: #1a1a1a;
-      padding: 2vw;
+      background: linear-gradient(180deg, rgba(21, 30, 47, 0.94), rgba(14, 20, 32, 0.96));
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 1.3vw;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+      gap: 0.9vw;
     }
 
     .room-status {
-      background-color: var(--border-color);
-      border-radius: 10px;
-      padding: 1.5vw;
-      margin-bottom: 1.5vw;
+      background: linear-gradient(180deg, rgba(41, 54, 80, 0.5), rgba(21, 30, 47, 0.7));
+      border: 1px solid rgba(100, 117, 153, 0.35);
+      border-radius: 14px;
+      padding: 1.1vw;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      min-height: 10vh;
+      justify-content: center;
+      min-height: 11.5vh;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
 
     .room-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1vw;
+      margin-bottom: 0.55vw;
     }
 
     .room-name {
-      font-size: 2vw;
-      font-weight: bold;
+      font-size: 1.5vw;
+      font-weight: 700;
     }
 
     .room-indicator {
-      width: 1.5vw;
-      height: 1.5vw;
+      width: 1.1vw;
+      height: 1.1vw;
       border-radius: 50%;
+      box-shadow: 0 0 10px currentColor;
     }
 
     .room-time {
-      font-size: 1.5vw;
-      opacity: 0.8;
+      font-size: 1.15vw;
+      color: var(--muted-text);
+      font-weight: 500;
     }
 
     .room-status.occupied .room-indicator {
       background-color: var(--room-occupied);
+      color: var(--room-occupied);
     }
 
     .room-status.available .room-indicator {
       background-color: var(--room-available);
+      color: var(--room-available);
     }
 
     .room-status.pending .room-indicator {
       background-color: var(--room-pending);
+      color: var(--room-pending);
     }
 
     footer {
-      background-color: var(--border-color);
-      padding: 1.5vw 2vw;
+      background: linear-gradient(180deg, rgba(16, 23, 37, 0.96), rgba(10, 16, 27, 0.98));
+      border-top: 1px solid var(--border-color);
+      padding: 1.1vw 1.4vw;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: flex-start;
+      justify-content: flex-start;
+      align-items: stretch;
       overflow-y: auto;
+      gap: 0.7vw;
     }
 
     .upcoming-header {
-      font-size: 1.8vw;
-      font-weight: bold;
-      margin-bottom: 1vw;
+      font-size: 1.25vw;
+      font-weight: 700;
+      color: #d9e4ff;
+      margin-bottom: 0.2vw;
     }
 
     .upcoming-booking {
@@ -174,91 +213,95 @@
       justify-content: space-between;
       align-items: center;
       width: 100%;
-      margin-bottom: 0.8vw;
-      font-size: 1.5vw;
+      font-size: 1.05vw;
+      padding: 0.75vw 0.95vw;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(41, 54, 80, 0.45), rgba(22, 31, 49, 0.65));
+      border: 1px solid rgba(100, 117, 153, 0.3);
+      color: #e5ebfd;
     }
 
     .upcoming-room-name {
-      font-weight: bold;
+      font-weight: 700;
     }
 
     .upcoming-time {
-      opacity: 0.8;
+      color: #b8c4e2;
+      font-weight: 500;
     }
 
     @media (max-width: 768px) {
       body {
         grid-template-rows: auto 1fr auto;
+        overflow-y: auto;
+        height: auto;
+        min-height: 100vh;
       }
 
       header {
         flex-direction: column;
         text-align: center;
-        padding: 1vw;
+        padding: 3vw;
       }
 
       .logo {
-        height: 6vh;
+        height: 7vh;
         margin-bottom: 1vh;
       }
 
       .datetime {
-        font-size: 4vw;
+        font-size: 6vw;
       }
 
       .date {
-        font-size: 2.5vw;
+        font-size: 3.2vw;
       }
 
       main {
         flex-direction: column;
+        padding: 3vw;
+        gap: 3vw;
       }
 
       .studio-visual {
-        flex: none;
-        height: 50vh;
+        height: 48vh;
       }
 
       .rooms-panel {
-        flex: none;
-        height: auto;
+        padding: 3vw;
+        gap: 2.4vw;
       }
 
       .room-status {
         padding: 3vw;
-        margin-bottom: 3vw;
-        min-height: 12vh;
+        min-height: 10vh;
       }
 
       .room-name {
-        font-size: 4vw;
+        font-size: 5vw;
       }
 
       .room-indicator {
-        width: 2.5vw;
-        height: 2.5vw;
+        width: 3.2vw;
+        height: 3.2vw;
       }
 
       .room-time {
-        font-size: 3vw;
+        font-size: 3.4vw;
       }
 
       footer {
         padding: 3vw;
+        gap: 2vw;
       }
 
       .upcoming-header {
-        font-size: 3.5vw;
+        font-size: 4.3vw;
       }
 
       .upcoming-booking {
-        font-size: 3vw;
-        margin-bottom: 1.5vw;
-      }
-
-      .clickable-area {
-        width: 3vw;
-        height: 3vw;
+        font-size: 3.2vw;
+        padding: 2.2vw 2.6vw;
       }
     }
   </style>
@@ -287,7 +330,7 @@
   </main>
 
   <footer>
-    <div class="upcoming-header">Naeste bookinger:</div>
+    <div class="upcoming-header">Næste bookinger:</div>
     <div class="upcoming-bookings-list" id="upcoming-bookings-list"></div>
   </footer>
 
@@ -417,6 +460,16 @@
         `;
         upcomingBookingsList.appendChild(upcomingBookingElement);
       });
+
+      if (!sortedUpcomingBookings.length) {
+        const emptyState = document.createElement("div");
+        emptyState.classList.add("upcoming-booking");
+        emptyState.innerHTML = `
+          <span class="upcoming-room-name">Ingen flere bookinger i dag</span>
+          <span class="upcoming-time">-</span>
+        `;
+        upcomingBookingsList.appendChild(emptyState);
+      }
     }
 
     function clock() {

@@ -328,13 +328,6 @@
         throw studiosError;
       }
 
-      const { data: customers, error: customersError } = await client
-        .from("Customer")
-        .select("id,name");
-      if (customersError) {
-        throw customersError;
-      }
-
       const { data: bookingsRaw, error: bookingsError } = await client
         .from("Booking")
         .select("*")
@@ -344,14 +337,27 @@
         throw bookingsError;
       }
 
+      // Customer lookup is optional: if policy blocks this table, keep live booking data.
+      let customerNameById = new Map();
+      try {
+        const { data: customers, error: customersError } = await client
+          .from("Customer")
+          .select("id,name");
+        if (!customersError && Array.isArray(customers)) {
+          customerNameById = new Map(customers.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
+        } else if (customersError) {
+          console.warn("Customer table not available for anon:", customersError.message);
+        }
+      } catch (error) {
+        console.warn("Customer lookup failed, continuing without customer names:", error);
+      }
+
       const rooms = (studios || [])
         .filter((studio) => (studio.name || "").toLowerCase().includes("studie"))
         .map((studio) => ({
           id: `studio-${studio.id}`,
           name: studio.name
         }));
-
-      const customerNameById = new Map((customers || []).map((c) => [String(c.id), c.name || "Ukendt kunde"]));
 
       const bookings = (bookingsRaw || [])
         .map((booking) => {

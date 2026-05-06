@@ -6,7 +6,13 @@
   <title>LD Studios infoskærm dashboard</title>
   <link rel="preload" href="01Logo_white_HIGH.png" as="image">
   <link rel="preload" href="LDstudiiosmap.png" as="image">
-  <link rel="preload" href="slideshow-opt/IMG_0592.jpg" as="image">
+  <link rel="preload" href="slideshow-opt/IMG_0592.jpg" as="image" fetchpriority="high">
+  <link rel="preload" href="slideshow-opt/IMG_1433.jpg" as="image">
+  <link rel="preload" href="slideshow-opt/IMG_1540.jpg" as="image">
+  <link rel="preload" href="slideshow-opt/IMG_4505%20(1).jpg" as="image">
+  <link rel="preload" href="slideshow-opt/Podcast%201.jpg" as="image">
+  <link rel="preload" href="slideshow-opt/Stage1.jpg" as="image">
+  <link rel="preload" href="slideshow-opt/stream%203.jpg" as="image">
   <style>
     :root {
       --bg-color: #080b11;
@@ -160,7 +166,7 @@
       transform: translateY(-50%);
       border-radius: 16px;
       opacity: 0;
-      transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: opacity 1.35s cubic-bezier(0.4, 0, 0.2, 1);
       pointer-events: none;
       z-index: 1;
       will-change: opacity;
@@ -382,7 +388,6 @@
 
     let slideshowIndex = 0;
     let slideshowTimer = null;
-    const slideCache = [];
 
     async function initSupabase() {
       if (BRUGE_SUPABASE) {
@@ -559,95 +564,149 @@
       clock();
     });
 
-    function loadSlideAsset(i) {
-      if (slideCache[i] !== undefined) {
-        return Promise.resolve(slideCache[i]);
-      }
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.className = "slide-image";
-        img.alt = "LD Studios billede";
-        img.decoding = "async";
-        img.fetchPriority = i === 0 ? "high" : "low";
-        img.onload = () => {
-          slideCache[i] = img;
-          resolve(img);
-        };
-        img.onerror = () => {
-          slideCache[i] = null;
-          resolve(null);
-        };
-        img.src = SLIDESHOW_SOURCES[i];
-      });
-    }
-
-    function prefetchSlide(i) {
-      if (i >= 0 && i < SLIDESHOW_SOURCES.length) {
-        loadSlideAsset(i).catch(() => {});
-      }
-    }
-
-    function activateSlideInFrame(frame, img, instant = false) {
-      frame.appendChild(img);
-      const apply = () => {
-        img.classList.add("active");
-        frame.querySelectorAll(".slide-image").forEach((el) => {
-          if (el !== img) el.classList.remove("active");
-        });
-      };
-      if (instant) {
-        apply();
-        return;
-      }
-      requestAnimationFrame(apply);
-    }
-
     function initSlideshow() {
       const frame = document.getElementById("slideshow-frame");
       const empty = document.getElementById("slideshow-empty");
       if (!frame || !empty || !SLIDESHOW_SOURCES.length) return;
 
+      frame.innerHTML = "";
+      const layerA = document.createElement("img");
+      const layerB = document.createElement("img");
+      const layers = [layerA, layerB];
+
+      layers.forEach((layer) => {
+        layer.className = "slide-image";
+        layer.alt = "LD Studios billede";
+        layer.loading = "eager";
+        layer.decoding = "async";
+        frame.appendChild(layer);
+      });
+      layerA.fetchPriority = "high";
+      layerB.fetchPriority = "low";
+
+      async function decodeIfPossible(layer) {
+        if (!layer.complete || layer.naturalWidth === 0) return false;
+        if (layer.decode && typeof layer.decode === "function") {
+          await layer.decode().catch(() => {});
+        }
+        return true;
+      }
+
+      async function loadSlideIntoLayer(layer, slideIndex) {
+        const url = SLIDESHOW_SOURCES[slideIndex];
+        if (
+          layer.dataset.slideIndexStored === String(slideIndex)
+          && layer.complete
+          && layer.naturalWidth > 0
+        ) {
+          return decodeIfPossible(layer);
+        }
+
+        layer.dataset.slideIndexStored = String(slideIndex);
+        layer.src = url;
+
+        const ok = await new Promise((resolve) => {
+          if (layer.complete && layer.naturalWidth > 0) {
+            resolve(true);
+            return;
+          }
+          layer.onload = () => resolve(layer.naturalWidth > 0);
+          layer.onerror = () => resolve(false);
+        });
+
+        if (!ok) return false;
+        return decodeIfPossible(layer);
+      }
+
+      async function resolveNextSlide(fromIndex, layer) {
+        const n = SLIDESHOW_SOURCES.length;
+        let pick = fromIndex % n;
+        for (let tries = 0; tries < n; tries += 1) {
+          if (await loadSlideIntoLayer(layer, pick)) return pick;
+          pick = (pick + 1) % n;
+        }
+        return -1;
+      }
+
+      function crossfade(activeIdx, instant) {
+        const cur = layers[activeIdx];
+        const standby = layers[1 - activeIdx];
+        const go = () => {
+          standby.classList.add("active");
+          cur.classList.remove("active");
+        };
+
+        if (instant) {
+          layerA.style.transition = "none";
+          layerB.style.transition = "none";
+          go();
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              layerA.style.transition = "";
+              layerB.style.transition = "";
+            });
+          });
+        } else {
+          requestAnimationFrame(go);
+        }
+      }
+
       (async () => {
-        const first = await loadSlideAsset(0);
-        if (!first) {
+        const n = SLIDESHOW_SOURCES.length;
+
+        const firstSlide = await resolveNextSlide(0, layerA);
+        if (firstSlide < 0) {
           empty.textContent = "Kunne ikke indlæse billeder";
+          empty.style.display = "";
+          layerA.remove();
+          layerB.remove();
           return;
         }
 
-        empty.style.display = "none";
-        activateSlideInFrame(frame, first, true);
+        slideshowIndex = firstSlide;
 
-        const n = SLIDESHOW_SOURCES.length;
-        prefetchSlide(1 % n);
-        setTimeout(() => prefetchSlide(2 % n), 400);
+        layerB.classList.remove("active");
+        layerA.classList.add("active");
+
+        layerA.style.transition = "none";
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            layerA.style.transition = "";
+          });
+        });
+
+        empty.style.display = "none";
+
+        function prefetchSlideIndex(i) {
+          if (i < 0 || i >= n) return;
+          const pre = new Image();
+          pre.src = SLIDESHOW_SOURCES[i];
+        }
+
+        prefetchSlideIndex(1 % n);
+        setTimeout(() => prefetchSlideIndex(2 % n), 400);
 
         if (n === 1) return;
 
-        const wait = (ms) => new Promise((resolve) => {
-          slideshowTimer = setTimeout(resolve, ms);
-        });
+        let activeIdx = 0;
 
-        (async function runSlideshowLoop() {
-          while (true) {
-            await wait(5000);
-            let next = (slideshowIndex + 1) % n;
-            prefetchSlide((next + 1) % n);
+        const wait = (ms) =>
+          new Promise((resolve) => {
+            slideshowTimer = setTimeout(resolve, ms);
+          });
 
-            let tries = 0;
-            let img = null;
-            while (tries < n && !img) {
-              img = await loadSlideAsset(next);
-              if (!img) {
-                next = (next + 1) % n;
-                tries += 1;
-              }
-            }
-            if (!img) continue;
+        while (true) {
+          await wait(5000);
+          const standby = layers[1 - activeIdx];
+          const picked = await resolveNextSlide((slideshowIndex + 1) % n, standby);
+          if (picked < 0) continue;
 
-            activateSlideInFrame(frame, img);
-            slideshowIndex = next;
-          }
-        })();
+          crossfade(activeIdx, false);
+          activeIdx = 1 - activeIdx;
+          slideshowIndex = picked;
+
+          prefetchSlideIndex((slideshowIndex + 2) % n);
+        }
       })();
     }
   </script>

@@ -187,17 +187,16 @@
     .slideshow-frame {
       position: absolute;
       inset: 0;
-      padding: 0.8vw;
     }
 
     .slide-image {
       position: absolute;
-      inset: 0.8vw;
-      width: calc(100% - 1.6vw);
-      height: calc(100% - 1.6vw);
+      inset: 0;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
       object-position: center center;
-      border-radius: 12px;
+      border-radius: 16px;
       opacity: 0;
       transition: opacity 0.9s ease-in-out;
       pointer-events: none;
@@ -334,14 +333,10 @@
         min-height: 12vh;
       }
 
-      .slideshow-frame {
-        padding: 2vw;
-      }
-
       .slide-image {
-        inset: 2vw;
-        width: calc(100% - 4vw);
-        height: calc(100% - 4vw);
+        inset: 0;
+        width: 100%;
+        height: 100%;
       }
 
       .slideshow-empty {

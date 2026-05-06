@@ -245,6 +245,14 @@
       text-overflow: ellipsis;
     }
 
+    .studio-booking-now {
+      font-weight: 800;
+      color: var(--secondary-color);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.82vw;
+    }
+
     @media (max-width: 768px) {
       body {
         grid-template-rows: auto 1fr auto;
@@ -333,6 +341,10 @@
       .studio-booking-line {
         font-size: 3vw;
       }
+
+      .studio-booking-now {
+        font-size: 2.85vw;
+      }
     }
   </style>
 </head>
@@ -370,7 +382,7 @@
   </main>
 
   <footer>
-    <div class="upcoming-header">Dagens bookinger (Studie 1-4):</div>
+    <div class="upcoming-header">Hvem er i studierne i dag:</div>
     <div class="upcoming-bookings-list" id="upcoming-bookings-list"></div>
   </footer>
 
@@ -419,29 +431,38 @@
       }
     }
 
+    function pickFirst(obj, keys) {
+      if (!obj) return undefined;
+      for (let i = 0; i < keys.length; i += 1) {
+        const v = obj[keys[i]];
+        if (v !== undefined && v !== null && v !== "") return v;
+      }
+      return undefined;
+    }
+
+    function bookingStatusAllowed(statusRaw) {
+      const s = String(statusRaw || "").trim().toLowerCase().replace(/\s+/g, "_");
+      if (!s) return true;
+      const blocked = new Set(["cancelled", "canceled", "declined", "no_show", "draft", "rejected"]);
+      return !blocked.has(s);
+    }
+
     async function getLiveSupabaseData() {
       const client = getSupabaseClient();
       if (!client) {
         throw new Error("Supabase SDK ikke tilgængelig");
       }
 
-      const { data: studios, error: studiosError } = await client
-        .from("Studio")
-        .select("id,name");
+      const { data: studios, error: studiosError } = await client.from("Studio").select("id,name");
       if (studiosError) {
         throw studiosError;
       }
 
-      const { data: bookingsRaw, error: bookingsError } = await client
-        .from("Booking")
-        .select("*")
-        .eq("status", "Confirmed")
-        .order("startTime", { ascending: true });
+      const { data: bookingsRaw, error: bookingsError } = await client.from("Booking").select("*");
       if (bookingsError) {
         throw bookingsError;
       }
 
-      // Customer lookup is optional: if policy blocks this table, keep live booking data.
       let customerNameById = new Map();
       try {
         const { data: customers, error: customersError } = await client
@@ -457,37 +478,91 @@
       }
 
       const rooms = (studios || [])
-        .filter((studio) => (studio.name || "").toLowerCase().includes("studie"))
+        .filter((studio) => {
+          const n = (studio.name || "").toLowerCase();
+          return n.includes("studie") || n.includes("studio");
+        })
         .map((studio) => ({
           id: `studio-${studio.id}`,
           name: studio.name
         }));
 
       const bookings = (bookingsRaw || [])
+        .filter((b) => bookingStatusAllowed(pickFirst(b, ["status", "Status"])))
         .map((booking) => {
-          const studioId =
-            booking.studioId ||
-            booking.studio_id ||
-            booking.room_id ||
-            booking.roomId ||
-            booking.StudioId;
+          const studioId = pickFirst(booking, [
+            "studioId",
+            "studio_id",
+            "StudioId",
+            "room_id",
+            "roomId",
+            "studio"
+          ]);
+          const startRaw = pickFirst(booking, ["startTime", "start_time", "StartTime", "start", "from"]);
+          const endRaw = pickFirst(booking, ["endTime", "end_time", "EndTime", "end", "to"]);
+          const customerId = pickFirst(booking, ["customerId", "customer_id", "CustomerId"]);
+          const inlineName = pickFirst(booking, [
+            "customerName",
+            "customer_name",
+            "guestName",
+            "guest_name",
+            "clientName",
+            "client_name"
+          ]);
 
-          if (!studioId || !booking.startTime || !booking.endTime) {
+          if (!studioId || startRaw == null || endRaw == null) {
             return null;
           }
 
+          const startDate = new Date(startRaw);
+          const endDate = new Date(endRaw);
+          if (Number.isNaN(startDate.valueOf()) || Number.isNaN(endDate.valueOf())) {
+            return null;
+          }
+
+          const sid = String(studioId).trim();
+          const room_id = sid.toLowerCase().startsWith("studio-") ? sid : `studio-${sid}`;
+
+          const lookupName =
+            (customerId != null && customerNameById.get(String(customerId))) || inlineName || null;
+
           return {
-            room_id: `studio-${studioId}`,
-            start_time: new Date(booking.startTime).toISOString(),
-            end_time: new Date(booking.endTime).toISOString(),
-            title: booking.title || booking.name || "Booking",
-            customer_name: customerNameById.get(String(booking.customerId)) || "Ukendt kunde",
-            status: "confirmed"
+            room_id,
+            start_time: startDate.toISOString(),
+            end_time: endDate.toISOString(),
+            title: pickFirst(booking, ["title", "name", "subject", "Title"]) || "Booking",
+            customer_name: lookupName || "Ukendt kunde",
+            status: String(pickFirst(booking, ["status", "Status"]) || "").toLowerCase()
           };
         })
         .filter(Boolean);
 
-      return { rooms: rooms.length ? rooms : DEFAULT_STUDIOS, bookings };
+      bookings.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+      const rawCount = (bookingsRaw || []).length;
+      if (rawCount > 0 && bookings.length === 0) {
+        console.warn(
+          "LD_screen1: Hentede",
+          rawCount,
+          "booking-rækker, men ingen kunne bruges. Tjek kolonnenavne (start/slut, studie-id). Eksempel:",
+          bookingsRaw[0]
+        );
+      }
+
+      let displayRooms = rooms;
+      if (!displayRooms.length) {
+        if (bookings.length > 0) {
+          const uniq = [...new Set(bookings.map((b) => b.room_id))].sort();
+          displayRooms = uniq.map((id, idx) => ({
+            id,
+            name: `Studie ${idx + 1}`
+          }));
+        } else {
+          displayRooms = DEFAULT_STUDIOS;
+        }
+      }
+
+      return { rooms: displayRooms, bookings };
     }
 
     function getEmptyStudioState() {
@@ -540,16 +615,37 @@
           .filter((b) => b.room_id === room.id)
           .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
-        const nextBooking = roomBookings.find((b) => new Date(b.end_time) >= now) || roomBookings[0];
+        const nowTs = now.getTime();
+        const activeNow = roomBookings.find((b) => {
+          const t0 = new Date(b.start_time).getTime();
+          const t1 = new Date(b.end_time).getTime();
+          return t0 <= nowTs && nowTs < t1;
+        });
+
+        const nextBooking =
+          activeNow ||
+          roomBookings.find((b) => new Date(b.start_time) > nowTs) ||
+          roomBookings.find((b) => new Date(b.end_time) >= nowTs) ||
+          roomBookings[0];
+
         const card = document.createElement("div");
         card.classList.add("studio-booking-card");
 
-        if (nextBooking) {
+        if (activeNow) {
           card.innerHTML = `
             <div class="studio-booking-title">${room.name}</div>
-            <div class="studio-booking-line">${fmt(nextBooking.start_time)} - ${fmt(nextBooking.end_time)}</div>
-            <div class="studio-booking-line">${nextBooking.title || "Booking"}</div>
+            <div class="studio-booking-line studio-booking-now">I studiet nu</div>
+            <div class="studio-booking-line">${activeNow.customer_name || "Ukendt kunde"}</div>
+            <div class="studio-booking-line">${activeNow.title || "Booking"}</div>
+            <div class="studio-booking-line">${fmt(activeNow.start_time)} – ${fmt(activeNow.end_time)}</div>
+          `;
+        } else if (nextBooking) {
+          card.innerHTML = `
+            <div class="studio-booking-title">${room.name}</div>
+            <div class="studio-booking-line">Næste i dag</div>
             <div class="studio-booking-line">${nextBooking.customer_name || "Ukendt kunde"}</div>
+            <div class="studio-booking-line">${nextBooking.title || "Booking"}</div>
+            <div class="studio-booking-line">${fmt(nextBooking.start_time)} – ${fmt(nextBooking.end_time)}</div>
           `;
         } else {
           card.innerHTML = `

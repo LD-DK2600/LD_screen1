@@ -147,7 +147,12 @@
       align-self: stretch;
     }
 
-    .slideshow-frame {
+    /*
+      Slideshow: ren CSS — ét billede ad gangen, 5s pr. billede, 7 billeder = 35s cyklus.
+      Ingen JS-timing (undgår kiosk/async/lag-problemer). Skift = hårde keyframes.
+      100/7 ≈ 14.285714% pr. segment.
+    */
+    .slideshow-frame.css-slideshow {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -156,8 +161,7 @@
       background: radial-gradient(ellipse at center, rgba(42, 54, 82, 0.5) 0%, rgba(16, 23, 37, 0.85) 100%);
     }
 
-    /* To lag, instant skift. visibility:hidden kan udskyde dekodning på kiosk — brug kun opacity (+ lavere z-index). */
-    .slide-layer {
+    .css-slideshow img {
       position: absolute;
       left: 0;
       top: 0;
@@ -168,34 +172,52 @@
       border-radius: 16px;
       pointer-events: none;
       opacity: 0;
-      z-index: 0;
-      transition: none;
-      image-rendering: auto;
+      z-index: 1;
+      animation-duration: 35s;
+      animation-iteration-count: infinite;
+      animation-timing-function: linear;
     }
 
-    .slide-layer.is-front {
-      opacity: 1;
-      z-index: 2;
-    }
+    .css-slideshow img:nth-child(1) { animation-name: css-slideshow-0; }
+    .css-slideshow img:nth-child(2) { animation-name: css-slideshow-1; }
+    .css-slideshow img:nth-child(3) { animation-name: css-slideshow-2; }
+    .css-slideshow img:nth-child(4) { animation-name: css-slideshow-3; }
+    .css-slideshow img:nth-child(5) { animation-name: css-slideshow-4; }
+    .css-slideshow img:nth-child(6) { animation-name: css-slideshow-5; }
+    .css-slideshow img:nth-child(7) { animation-name: css-slideshow-6; }
 
-    .slideshow-error {
-      position: absolute;
-      inset: 0;
-      z-index: 5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 1vw;
-      color: #8ea0c8;
-      font-size: 0.95vw;
-      letter-spacing: 0.02em;
-      background: rgba(8, 11, 17, 0.75);
-      border-radius: 16px;
+    @keyframes css-slideshow-0 {
+      0%, 14.285714% { opacity: 1; z-index: 2; }
+      14.285715%, 100% { opacity: 0; z-index: 1; }
     }
-
-    .slideshow-error[hidden] {
-      display: none !important;
+    @keyframes css-slideshow-1 {
+      0%, 14.285714% { opacity: 0; z-index: 1; }
+      14.285715%, 28.571428% { opacity: 1; z-index: 2; }
+      28.571429%, 100% { opacity: 0; z-index: 1; }
+    }
+    @keyframes css-slideshow-2 {
+      0%, 28.571428% { opacity: 0; z-index: 1; }
+      28.571429%, 42.857142% { opacity: 1; z-index: 2; }
+      42.857143%, 100% { opacity: 0; z-index: 1; }
+    }
+    @keyframes css-slideshow-3 {
+      0%, 42.857142% { opacity: 0; z-index: 1; }
+      42.857143%, 57.142857% { opacity: 1; z-index: 2; }
+      57.142858%, 100% { opacity: 0; z-index: 1; }
+    }
+    @keyframes css-slideshow-4 {
+      0%, 57.142857% { opacity: 0; z-index: 1; }
+      57.142858%, 71.428571% { opacity: 1; z-index: 2; }
+      71.428572%, 100% { opacity: 0; z-index: 1; }
+    }
+    @keyframes css-slideshow-5 {
+      0%, 71.428571% { opacity: 0; z-index: 1; }
+      71.428572%, 85.714285% { opacity: 1; z-index: 2; }
+      85.714286%, 100% { opacity: 0; z-index: 1; }
+    }
+    @keyframes css-slideshow-6 {
+      0%, 85.714285% { opacity: 0; z-index: 1; }
+      85.714286%, 100% { opacity: 1; z-index: 2; }
     }
 
     footer {
@@ -310,14 +332,8 @@
         min-height: 12vh;
       }
 
-      .slide-layer {
-        width: 100%;
-        height: 100%;
-      }
-
-      .slideshow-error {
-        font-size: 2.8vw;
-        padding: 2vw;
+      .css-slideshow img {
+        border-radius: 14px;
       }
 
       footer {
@@ -366,28 +382,15 @@
       <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" fetchpriority="high" decoding="async">
     </div>
     <div class="side-empty-box" aria-label="Billedslideshow">
-      <div class="slideshow-frame" id="slideshow-frame">
-        <img
-          id="slide-a"
-          class="slide-layer is-front"
-          alt="LD Studios billede"
-          src="slideshow-opt/IMG_0592.jpg"
-          width="800"
-          height="600"
-          loading="eager"
-          decoding="async"
-          fetchpriority="high">
-        <img
-          id="slide-b"
-          class="slide-layer"
-          alt=""
-          width="800"
-          height="600"
-          loading="eager"
-          decoding="async"
-          fetchpriority="low">
+      <div class="slideshow-frame css-slideshow" id="slideshow-frame">
+        <img alt="LD Studios" src="slideshow-opt/IMG_0592.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="high">
+        <img alt="" src="slideshow-opt/IMG_1433.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
+        <img alt="" src="slideshow-opt/IMG_1540.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
+        <img alt="" src="slideshow-opt/IMG_4505%20(1).jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
+        <img alt="" src="slideshow-opt/Podcast%201.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
+        <img alt="" src="slideshow-opt/Stage1.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
+        <img alt="" src="slideshow-opt/stream%203.jpg" width="800" height="600" loading="eager" decoding="async" fetchpriority="low">
       </div>
-      <div class="slideshow-error" id="slideshow-empty" hidden>Kunne ikke indlæse billeder</div>
     </div>
 
   </main>
@@ -408,19 +411,6 @@
       { id: "studio-3", name: "Studie 3" },
       { id: "studio-4", name: "Studie 4" }
     ];
-    const SLIDESHOW_SOURCES = [
-      "slideshow-opt/IMG_0592.jpg",
-      "slideshow-opt/IMG_1433.jpg",
-      "slideshow-opt/IMG_1540.jpg",
-      "slideshow-opt/IMG_4505%20(1).jpg",
-      "slideshow-opt/Podcast%201.jpg",
-      "slideshow-opt/Stage1.jpg",
-      "slideshow-opt/stream%203.jpg"
-    ];
-
-    let slideshowIndex = 0;
-    let slideshowTimer = null;
-
     async function initSupabase() {
       if (BRUGE_SUPABASE) {
         try {
@@ -592,140 +582,8 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      initSlideshow();
       clock();
     });
-
-    function initSlideshow() {
-      const frame = document.getElementById("slideshow-frame");
-      const errEl = document.getElementById("slideshow-empty");
-      const a = document.getElementById("slide-a");
-      const b = document.getElementById("slide-b");
-      if (!frame || !errEl || !a || !b || !SLIDESHOW_SOURCES.length) return;
-
-      const layers = [a, b];
-      layers.forEach((layer) => {
-        layer.alt = "LD Studios billede";
-      });
-
-      errEl.hidden = true;
-
-      function showLoadError(message) {
-        errEl.textContent = message || "Kunne ikke indlæse billeder";
-        errEl.hidden = false;
-      }
-
-      async function warmNetworkCacheParallel() {
-        await Promise.all(
-          SLIDESHOW_SOURCES.map(
-            (src) =>
-              new Promise((resolve) => {
-                const im = new Image();
-                im.decoding = "async";
-                im.onload = () => resolve();
-                im.onerror = () => resolve();
-                im.src = src;
-              }),
-          ),
-        );
-      }
-
-      async function pokeDecodeBudget(layer, capMs = 900) {
-        if (!layer.complete || layer.naturalWidth === 0 || !layer.decode) return;
-        await Promise.race([
-          layer.decode().catch(() => {}),
-          new Promise((r) => setTimeout(r, capMs)),
-        ]);
-      }
-
-      async function loadInto(layer, slideIndex) {
-        const url = SLIDESHOW_SOURCES[slideIndex];
-        if (
-          layer.dataset.slideIndexStored === String(slideIndex)
-          && layer.complete
-          && layer.naturalWidth > 0
-        ) {
-          await pokeDecodeBudget(layer);
-          return true;
-        }
-
-        layer.dataset.slideIndexStored = String(slideIndex);
-        layer.src = url;
-
-        const ok = await new Promise((resolve) => {
-          if (layer.complete && layer.naturalWidth > 0) {
-            resolve(true);
-            return;
-          }
-          layer.onload = () => resolve(layer.naturalWidth > 0);
-          layer.onerror = () => resolve(false);
-        });
-
-        if (!ok) return false;
-        await pokeDecodeBudget(layer);
-        return true;
-      }
-
-      async function pickFirstSlideIndex(layer) {
-        const n = SLIDESHOW_SOURCES.length;
-        for (let i = 0; i < n; i += 1) {
-          if (await loadInto(layer, i)) return i;
-        }
-        return -1;
-      }
-
-      async function loadFirstAvailable(layer, startIndex) {
-        const n = SLIDESHOW_SOURCES.length;
-        let pick = startIndex % n;
-        for (let tries = 0; tries < n; tries += 1) {
-          if (await loadInto(layer, pick)) return pick;
-          pick = (pick + 1) % n;
-        }
-        return -1;
-      }
-
-      function setFront(layerArrayIndex) {
-        layers.forEach((layer, i) => layer.classList.toggle("is-front", i === layerArrayIndex));
-      }
-
-      (async () => {
-        const n = SLIDESHOW_SOURCES.length;
-
-        const first = await pickFirstSlideIndex(a);
-        if (first < 0) {
-          showLoadError();
-          return;
-        }
-
-        slideshowIndex = first;
-        setFront(0);
-        errEl.hidden = true;
-
-        if (n > 1) await warmNetworkCacheParallel();
-
-        if (n === 1) return;
-
-        const wait = (ms) =>
-          new Promise((resolve) => {
-            slideshowTimer = setTimeout(resolve, ms);
-          });
-
-        let visibleLayerIx = 0;
-
-        while (true) {
-          await wait(5000);
-          const standbyLayerIx = 1 - visibleLayerIx;
-          const standby = layers[standbyLayerIx];
-          const picked = await loadFirstAvailable(standby, (slideshowIndex + 1) % n);
-
-          if (picked < 0) continue;
-
-          setFront(standbyLayerIx);
-          visibleLayerIx = standbyLayerIx;
-          slideshowIndex = picked;
-        }
-      })();
-    }
   </script>
 </body>
 </html>

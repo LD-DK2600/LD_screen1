@@ -7,12 +7,6 @@
   <link rel="preload" href="01Logo_white_HIGH.png" as="image">
   <link rel="preload" href="LDstudiiosmap.png" as="image">
   <link rel="preload" href="slideshow-opt/IMG_0592.jpg" as="image" fetchpriority="high">
-  <link rel="preload" href="slideshow-opt/IMG_1433.jpg" as="image">
-  <link rel="preload" href="slideshow-opt/IMG_1540.jpg" as="image">
-  <link rel="preload" href="slideshow-opt/IMG_4505%20(1).jpg" as="image">
-  <link rel="preload" href="slideshow-opt/Podcast%201.jpg" as="image">
-  <link rel="preload" href="slideshow-opt/Stage1.jpg" as="image">
-  <link rel="preload" href="slideshow-opt/stream%203.jpg" as="image">
   <style>
     :root {
       --bg-color: #080b11;
@@ -154,6 +148,7 @@
     .slideshow-frame {
       position: absolute;
       inset: 0;
+      z-index: 2;
     }
 
     .slide-image {
@@ -166,7 +161,7 @@
       transform: translateY(-50%);
       border-radius: 16px;
       opacity: 0;
-      transition: opacity 1.35s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: opacity 1.05s cubic-bezier(0.4, 0, 0.2, 1);
       pointer-events: none;
       z-index: 1;
       will-change: opacity;
@@ -178,6 +173,8 @@
     }
 
     .slideshow-empty {
+      position: relative;
+      z-index: 1;
       color: #8ea0c8;
       font-size: 0.95vw;
       letter-spacing: 0.02em;
@@ -354,7 +351,18 @@
       <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" fetchpriority="high" decoding="async">
     </div>
     <div class="side-empty-box" aria-label="Billedslideshow">
-      <div class="slideshow-frame" id="slideshow-frame"></div>
+      <div class="slideshow-frame" id="slideshow-frame">
+        <img
+          id="slideshow-early"
+          class="slide-image active"
+          alt="LD Studios billede"
+          src="slideshow-opt/IMG_0592.jpg"
+          width="800"
+          height="600"
+          loading="eager"
+          decoding="sync"
+          fetchpriority="high">
+      </div>
       <div class="slideshow-empty" id="slideshow-empty">Tilføj billeder til slideshow...</div>
     </div>
 
@@ -569,28 +577,39 @@
       const empty = document.getElementById("slideshow-empty");
       if (!frame || !empty || !SLIDESHOW_SOURCES.length) return;
 
-      frame.innerHTML = "";
-      const layerA = document.createElement("img");
-      const layerB = document.createElement("img");
+      let layerA = frame.querySelector("#slideshow-early");
+      let layerB;
+
+      const firstUrl = SLIDESHOW_SOURCES[0];
+      const earlyOk = layerA instanceof HTMLImageElement && layerA.getAttribute("src") === firstUrl;
+
+      if (earlyOk) {
+        layerA.classList.add("slide-image");
+        layerA.alt = "LD Studios billede";
+        layerA.loading = "eager";
+        layerB = document.createElement("img");
+        frame.appendChild(layerB);
+      } else {
+        if (layerA) layerA.remove();
+        frame.replaceChildren();
+        layerA = document.createElement("img");
+        layerB = document.createElement("img");
+        frame.appendChild(layerA);
+        frame.appendChild(layerB);
+      }
+
       const layers = [layerA, layerB];
 
       layers.forEach((layer) => {
-        layer.className = "slide-image";
+        if (!layer.classList.contains("slide-image")) {
+          layer.className = "slide-image";
+        }
         layer.alt = "LD Studios billede";
         layer.loading = "eager";
-        layer.decoding = "async";
-        frame.appendChild(layer);
+        if (layer.id !== "slideshow-early") layer.decoding = "async";
       });
       layerA.fetchPriority = "high";
       layerB.fetchPriority = "low";
-
-      async function decodeIfPossible(layer) {
-        if (!layer.complete || layer.naturalWidth === 0) return false;
-        if (layer.decode && typeof layer.decode === "function") {
-          await layer.decode().catch(() => {});
-        }
-        return true;
-      }
 
       async function loadSlideIntoLayer(layer, slideIndex) {
         const url = SLIDESHOW_SOURCES[slideIndex];
@@ -599,7 +618,7 @@
           && layer.complete
           && layer.naturalWidth > 0
         ) {
-          return decodeIfPossible(layer);
+          return true;
         }
 
         layer.dataset.slideIndexStored = String(slideIndex);
@@ -614,8 +633,7 @@
           layer.onerror = () => resolve(false);
         });
 
-        if (!ok) return false;
-        return decodeIfPossible(layer);
+        return ok;
       }
 
       async function resolveNextSlide(fromIndex, layer) {
@@ -628,27 +646,39 @@
         return -1;
       }
 
+      function clearInlineTransition(el) {
+        el.style.removeProperty("transition");
+      }
+
+      function revealStandbyNoFade(standby) {
+        standby.style.transition = "none";
+        standby.classList.add("active");
+        standby.offsetHeight;
+        clearInlineTransition(standby);
+      }
+
       function crossfade(activeIdx, instant) {
         const cur = layers[activeIdx];
         const standby = layers[1 - activeIdx];
-        const go = () => {
-          standby.classList.add("active");
-          cur.classList.remove("active");
-        };
 
         if (instant) {
           layerA.style.transition = "none";
           layerB.style.transition = "none";
-          go();
+          standby.classList.add("active");
+          cur.classList.remove("active");
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              layerA.style.transition = "";
-              layerB.style.transition = "";
+              clearInlineTransition(layerA);
+              clearInlineTransition(layerB);
             });
           });
-        } else {
-          requestAnimationFrame(go);
+          return;
         }
+
+        requestAnimationFrame(() => {
+          revealStandbyNoFade(standby);
+          cur.classList.remove("active");
+        });
       }
 
       (async () => {
@@ -658,23 +688,13 @@
         if (firstSlide < 0) {
           empty.textContent = "Kunne ikke indlæse billeder";
           empty.style.display = "";
-          layerA.remove();
-          layerB.remove();
+          frame.replaceChildren();
           return;
         }
 
         slideshowIndex = firstSlide;
-
         layerB.classList.remove("active");
-        layerA.classList.add("active");
-
-        layerA.style.transition = "none";
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            layerA.style.transition = "";
-          });
-        });
-
+        revealStandbyNoFade(layerA);
         empty.style.display = "none";
 
         function prefetchSlideIndex(i) {

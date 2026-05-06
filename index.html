@@ -590,14 +590,16 @@
     function activateSlideInFrame(frame, img, instant = false) {
       frame.appendChild(img);
       const apply = () => {
-        frame.querySelectorAll(".slide-image").forEach((el) => el.classList.remove("active"));
         img.classList.add("active");
+        frame.querySelectorAll(".slide-image").forEach((el) => {
+          if (el !== img) el.classList.remove("active");
+        });
       };
       if (instant) {
         apply();
         return;
       }
-      requestAnimationFrame(() => requestAnimationFrame(apply));
+      requestAnimationFrame(apply);
     }
 
     function initSlideshow() {
@@ -621,24 +623,31 @@
 
         if (n === 1) return;
 
-        slideshowTimer = setInterval(async () => {
-          let next = (slideshowIndex + 1) % n;
-          prefetchSlide((next + 1) % n);
+        const wait = (ms) => new Promise((resolve) => {
+          slideshowTimer = setTimeout(resolve, ms);
+        });
 
-          let tries = 0;
-          let img = null;
-          while (tries < n && !img) {
-            img = await loadSlideAsset(next);
-            if (!img) {
-              next = (next + 1) % n;
-              tries += 1;
+        (async function runSlideshowLoop() {
+          while (true) {
+            await wait(5000);
+            let next = (slideshowIndex + 1) % n;
+            prefetchSlide((next + 1) % n);
+
+            let tries = 0;
+            let img = null;
+            while (tries < n && !img) {
+              img = await loadSlideAsset(next);
+              if (!img) {
+                next = (next + 1) % n;
+                tries += 1;
+              }
             }
-          }
-          if (!img) return;
+            if (!img) continue;
 
-          activateSlideInFrame(frame, img);
-          slideshowIndex = next;
-        }, 5000);
+            activateSlideInFrame(frame, img);
+            slideshowIndex = next;
+          }
+        })();
       })();
     }
   </script>

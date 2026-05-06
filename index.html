@@ -1,2 +1,444 @@
-<!doctype html>
-<html><body><h1>LD Screen virker</h1></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LD Studios infoskærm dashboard</title>
+  <style>
+    :root {
+      --bg-color: #000;
+      --text-color: #fff;
+      --primary-color: #2f94e0;
+      --secondary-color: #58c96d;
+      --tertiary-color: #ffc107;
+      --danger-color: #dc3545;
+      --room-occupied: #ff6347;
+      --room-available: #3cb371;
+      --room-pending: #ffd700;
+      --lamp-on: #ffd700;
+      --lamp-off: #333;
+      --border-color: #333;
+      --font-family: "Inter", sans-serif;
+      --header-height: 10vh;
+      --footer-height: 20vh;
+      --main-height: 70vh;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-family);
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: var(--header-height) var(--main-height) var(--footer-height);
+      height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 2vw;
+      background-color: var(--border-color);
+    }
+
+    .logo {
+      height: 8vh;
+    }
+
+    .datetime {
+      text-align: right;
+      font-size: 2.5vw;
+    }
+
+    .date {
+      font-size: 1.5vw;
+      opacity: 0.8;
+    }
+
+    main {
+      display: flex;
+    }
+
+    .studio-visual {
+      flex: 2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    .studio-visual img {
+      max-width: 95%;
+      max-height: 95%;
+      object-fit: contain;
+    }
+
+    .clickable-area {
+      position: absolute;
+      background-color: rgba(255, 0, 0, 0);
+      border: 1px solid rgba(0, 255, 0, 0);
+      cursor: pointer;
+      border-radius: 50%;
+    }
+
+    #lamp-studio-1 {
+      top: 35%;
+      left: 30%;
+      width: 2vw;
+      height: 2vw;
+    }
+
+    #lamp-studio-2 {
+      top: 35%;
+      left: 60%;
+      width: 2vw;
+      height: 2vw;
+    }
+
+    .rooms-panel {
+      flex: 1;
+      background-color: #1a1a1a;
+      padding: 2vw;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .room-status {
+      background-color: var(--border-color);
+      border-radius: 10px;
+      padding: 1.5vw;
+      margin-bottom: 1.5vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 10vh;
+    }
+
+    .room-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1vw;
+    }
+
+    .room-name {
+      font-size: 2vw;
+      font-weight: bold;
+    }
+
+    .room-indicator {
+      width: 1.5vw;
+      height: 1.5vw;
+      border-radius: 50%;
+    }
+
+    .room-time {
+      font-size: 1.5vw;
+      opacity: 0.8;
+    }
+
+    .room-status.occupied .room-indicator {
+      background-color: var(--room-occupied);
+    }
+
+    .room-status.available .room-indicator {
+      background-color: var(--room-available);
+    }
+
+    .room-status.pending .room-indicator {
+      background-color: var(--room-pending);
+    }
+
+    footer {
+      background-color: var(--border-color);
+      padding: 1.5vw 2vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-y: auto;
+    }
+
+    .upcoming-header {
+      font-size: 1.8vw;
+      font-weight: bold;
+      margin-bottom: 1vw;
+    }
+
+    .upcoming-booking {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 0.8vw;
+      font-size: 1.5vw;
+    }
+
+    .upcoming-room-name {
+      font-weight: bold;
+    }
+
+    .upcoming-time {
+      opacity: 0.8;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        grid-template-rows: auto 1fr auto;
+      }
+
+      header {
+        flex-direction: column;
+        text-align: center;
+        padding: 1vw;
+      }
+
+      .logo {
+        height: 6vh;
+        margin-bottom: 1vh;
+      }
+
+      .datetime {
+        font-size: 4vw;
+      }
+
+      .date {
+        font-size: 2.5vw;
+      }
+
+      main {
+        flex-direction: column;
+      }
+
+      .studio-visual {
+        flex: none;
+        height: 50vh;
+      }
+
+      .rooms-panel {
+        flex: none;
+        height: auto;
+      }
+
+      .room-status {
+        padding: 3vw;
+        margin-bottom: 3vw;
+        min-height: 12vh;
+      }
+
+      .room-name {
+        font-size: 4vw;
+      }
+
+      .room-indicator {
+        width: 2.5vw;
+        height: 2.5vw;
+      }
+
+      .room-time {
+        font-size: 3vw;
+      }
+
+      footer {
+        padding: 3vw;
+      }
+
+      .upcoming-header {
+        font-size: 3.5vw;
+      }
+
+      .upcoming-booking {
+        font-size: 3vw;
+        margin-bottom: 1.5vw;
+      }
+
+      .clickable-area {
+        width: 3vw;
+        height: 3vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="https://ld-dk2600.github.io/LD_screen1/ld_logo.png" alt="LD Studios Logo" class="logo">
+    <div class="datetime">
+      <div class="time" id="time"></div>
+      <div class="date" id="date"></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="studio-visual">
+      <img src="https://ld-dk2600.github.io/LD_screen1/studio_layout.jpg" alt="Studio Layout" usemap="#studio-map">
+      <map name="studio-map">
+        <area shape="circle" coords="300,200,50" href="#" alt="Studio 1" id="area-studio-1" data-room-id="studio-1">
+        <area shape="circle" coords="700,200,50" href="#" alt="Studio 2" id="area-studio-2" data-room-id="studio-2">
+      </map>
+      <div class="clickable-area" id="lamp-studio-1" data-room-id="studio-1"></div>
+      <div class="clickable-area" id="lamp-studio-2" data-room-id="studio-2"></div>
+    </div>
+
+    <div class="rooms-panel" id="rooms-panel"></div>
+  </main>
+
+  <footer>
+    <div class="upcoming-header">Naeste bookinger:</div>
+    <div class="upcoming-bookings-list" id="upcoming-bookings-list"></div>
+  </footer>
+
+  <script>
+    const BRUGE_SUPABASE = false;
+    let SUPABASE_URL = "";
+    let SUPABASE_ANON_KEY = "";
+
+    async function initSupabase() {
+      if (BRUGE_SUPABASE) {
+        return getMock();
+      } else {
+        return getMock();
+      }
+    }
+
+    function getMock() {
+      const now = new Date();
+      const addHours = (date, h) => new Date(date.getTime() + h * 60 * 60 * 1000);
+      const addMinutes = (date, m) => new Date(date.getTime() + m * 60 * 1000);
+
+      const rooms = [
+        { id: "studio-1", name: "Studio 1" },
+        { id: "studio-2", name: "Studio 2" }
+      ];
+
+      const bookings = [
+        { room_id: "studio-1", start_time: addMinutes(now, -30).toISOString(), end_time: addMinutes(now, 30).toISOString(), title: "Session A", status: "occupied" },
+        { room_id: "studio-2", start_time: addHours(now, 1).toISOString(), end_time: addHours(now, 3).toISOString(), title: "Session B", status: "pending" },
+        { room_id: "studio-1", start_time: addHours(now, 2).toISOString(), end_time: addHours(now, 4).toISOString(), title: "Session C", status: "pending" },
+        { room_id: "studio-2", start_time: addMinutes(now, -90).toISOString(), end_time: addMinutes(now, -30).toISOString(), title: "Past Session D", status: "completed" }
+      ];
+
+      return { rooms, bookings };
+    }
+
+    function fmt(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function isNow(start, end) {
+      const now = new Date();
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      return now >= startDate && now < endDate;
+    }
+
+    function isToday(dateString) {
+      const today = new Date();
+      const date = new Date(dateString);
+      return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+    }
+
+    function status(room, bookings) {
+      const now = new Date();
+      const currentBooking = bookings.find((b) => b.room_id === room.id && isNow(b.start_time, b.end_time));
+      if (currentBooking) {
+        return { status: "occupied", time: `${fmt(currentBooking.start_time)} - ${fmt(currentBooking.end_time)}` };
+      }
+
+      const nextBooking = bookings
+        .filter((b) => b.room_id === room.id && new Date(b.start_time) > now)
+        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0];
+
+      if (nextBooking && isToday(nextBooking.start_time)) {
+        return { status: "pending", time: `${fmt(nextBooking.start_time)} - ${fmt(nextBooking.end_time)}` };
+      }
+
+      return { status: "available", time: "Ledig" };
+    }
+
+    async function render() {
+      const { rooms, bookings } = await initSupabase();
+      const roomsPanel = document.getElementById("rooms-panel");
+      roomsPanel.innerHTML = "";
+
+      const upcomingBookingsList = document.getElementById("upcoming-bookings-list");
+      upcomingBookingsList.innerHTML = "";
+
+      const now = new Date();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const relevantBookings = bookings.filter((b) => {
+        const bookingDate = new Date(b.start_time);
+        return bookingDate >= today && bookingDate < tomorrow;
+      });
+
+      rooms.forEach((room) => {
+        const roomStatusData = status(room, bookings);
+        const roomElement = document.createElement("div");
+        roomElement.classList.add("room-status", roomStatusData.status);
+        roomElement.innerHTML = `
+          <div class="room-header">
+            <div class="room-name">${room.name}</div>
+            <div class="room-indicator"></div>
+          </div>
+          <div class="room-time">${roomStatusData.time}</div>
+        `;
+        roomsPanel.appendChild(roomElement);
+
+        const lamp = document.getElementById(`lamp-${room.id}`);
+        if (lamp) {
+          if (roomStatusData.status === "occupied") {
+            lamp.style.backgroundColor = "var(--lamp-on)";
+            lamp.style.boxShadow = "0 0 15px var(--lamp-on)";
+          } else {
+            lamp.style.backgroundColor = "var(--lamp-off)";
+            lamp.style.boxShadow = "none";
+          }
+        }
+      });
+
+      const sortedUpcomingBookings = relevantBookings
+        .filter((b) => new Date(b.start_time) > now)
+        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+      sortedUpcomingBookings.slice(0, 3).forEach((booking) => {
+        const upcomingBookingElement = document.createElement("div");
+        upcomingBookingElement.classList.add("upcoming-booking");
+        upcomingBookingElement.innerHTML = `
+          <span class="upcoming-room-name">${rooms.find((r) => r.id === booking.room_id)?.name || booking.room_id}</span>
+          <span class="upcoming-time">${fmt(booking.start_time)} - ${fmt(booking.end_time)}</span>
+        `;
+        upcomingBookingsList.appendChild(upcomingBookingElement);
+      });
+    }
+
+    function clock() {
+      const now = new Date();
+      const timeElement = document.getElementById("time");
+      const dateElement = document.getElementById("date");
+
+      timeElement.textContent = now.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+      dateElement.textContent = now.toLocaleDateString("da-DK", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+
+      render();
+      setTimeout(clock, 1000 * 30);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      clock();
+    });
+  </script>
+</body>
+</html>

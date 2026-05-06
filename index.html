@@ -304,14 +304,20 @@
     const BRUGE_SUPABASE = true;
     const SUPABASE_URL = "https://vvrruinrupnginlkixeq.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_YbvhilZ2n49AVN1VWZvEuw_1vjQP-mk";
+    const DEFAULT_STUDIOS = [
+      { id: "studio-1", name: "Studie 1" },
+      { id: "studio-2", name: "Studie 2" },
+      { id: "studio-3", name: "Studie 3" },
+      { id: "studio-4", name: "Studie 4" }
+    ];
 
     async function initSupabase() {
       if (BRUGE_SUPABASE) {
         try {
           return await getLiveSupabaseData();
         } catch (error) {
-          console.error("Supabase fetch failed, using mock data:", error);
-          return getMock();
+          console.error("Supabase fetch failed, using empty studio fallback:", error);
+          return getEmptyStudioState();
         }
       } else {
         return getMock();
@@ -383,11 +389,11 @@
         })
         .filter(Boolean);
 
-      if (!rooms.length) {
-        throw new Error("No studios returned from Supabase.");
-      }
+      return { rooms: rooms.length ? rooms : DEFAULT_STUDIOS, bookings };
+    }
 
-      return { rooms, bookings };
+    function getEmptyStudioState() {
+      return { rooms: DEFAULT_STUDIOS, bookings: [] };
     }
 
     function getMock() {

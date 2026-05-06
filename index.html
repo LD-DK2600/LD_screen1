@@ -149,37 +149,50 @@
       position: absolute;
       inset: 0;
       z-index: 2;
+      background: radial-gradient(ellipse at center, rgba(42, 54, 82, 0.5) 0%, rgba(16, 23, 37, 0.85) 100%);
     }
 
-    .slide-image {
+    /* To lag, instant skift — ingen opacity-crossfade (undgår falsk "sort" på TV-browsere) */
+    .slide-layer {
       position: absolute;
-      left: 0;
-      top: 50%;
-      width: 100%;
+      inset: 0;
+      width: auto;
       height: auto;
-      min-height: 100%;
-      transform: translateY(-50%);
+      max-width: 100%;
+      max-height: 100%;
+      margin: auto;
+      object-fit: contain;
+      object-position: center center;
       border-radius: 16px;
-      opacity: 0;
-      transition: opacity 1.05s cubic-bezier(0.4, 0, 0.2, 1);
       pointer-events: none;
-      z-index: 1;
-      will-change: opacity;
+      visibility: hidden;
+      z-index: 0;
+      image-rendering: auto;
     }
 
-    .slide-image.active {
-      z-index: 2;
-      opacity: 1;
+    .slide-layer.is-front {
+      visibility: visible;
+      z-index: 1;
     }
 
-    .slideshow-empty {
-      position: relative;
-      z-index: 1;
+    .slideshow-error {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1vw;
       color: #8ea0c8;
       font-size: 0.95vw;
       letter-spacing: 0.02em;
-      text-align: center;
-      padding: 1vw;
+      background: rgba(8, 11, 17, 0.75);
+      border-radius: 16px;
+    }
+
+    .slideshow-error[hidden] {
+      display: none !important;
     }
 
     footer {
@@ -294,13 +307,12 @@
         min-height: 12vh;
       }
 
-      .slide-image {
-        width: 100%;
-        height: auto;
-        min-height: 100%;
+      .slide-layer {
+        max-width: 100%;
+        max-height: 100%;
       }
 
-      .slideshow-empty {
+      .slideshow-error {
         font-size: 2.8vw;
         padding: 2vw;
       }
@@ -353,17 +365,26 @@
     <div class="side-empty-box" aria-label="Billedslideshow">
       <div class="slideshow-frame" id="slideshow-frame">
         <img
-          id="slideshow-early"
-          class="slide-image active"
+          id="slide-a"
+          class="slide-layer is-front"
           alt="LD Studios billede"
           src="slideshow-opt/IMG_0592.jpg"
           width="800"
           height="600"
           loading="eager"
-          decoding="sync"
+          decoding="async"
           fetchpriority="high">
+        <img
+          id="slide-b"
+          class="slide-layer"
+          alt=""
+          width="800"
+          height="600"
+          loading="eager"
+          decoding="async"
+          fetchpriority="low">
       </div>
-      <div class="slideshow-empty" id="slideshow-empty">Tilføj billeder til slideshow...</div>
+      <div class="slideshow-error" id="slideshow-empty" hidden>Kunne ikke indlæse billeder</div>
     </div>
 
   </main>
@@ -574,57 +595,37 @@
 
     function initSlideshow() {
       const frame = document.getElementById("slideshow-frame");
-      const empty = document.getElementById("slideshow-empty");
-      if (!frame || !empty || !SLIDESHOW_SOURCES.length) return;
+      const errEl = document.getElementById("slideshow-empty");
+      const a = document.getElementById("slide-a");
+      const b = document.getElementById("slide-b");
+      if (!frame || !errEl || !a || !b || !SLIDESHOW_SOURCES.length) return;
 
-      let layerA = frame.querySelector("#slideshow-early");
-      let layerB;
+      const layers = [a, b];
+      layers.forEach((layer) => {
+        layer.alt = "LD Studios billede";
+      });
 
-      const firstUrl = SLIDESHOW_SOURCES[0];
-      const earlyOk = layerA instanceof HTMLImageElement && layerA.getAttribute("src") === firstUrl;
+      errEl.hidden = true;
 
-      if (earlyOk) {
-        layerA.classList.add("slide-image");
-        layerA.alt = "LD Studios billede";
-        layerA.loading = "eager";
-        layerB = document.createElement("img");
-        frame.appendChild(layerB);
-      } else {
-        if (layerA) layerA.remove();
-        frame.replaceChildren();
-        layerA = document.createElement("img");
-        layerB = document.createElement("img");
-        frame.appendChild(layerA);
-        frame.appendChild(layerB);
+      function showLoadError(message) {
+        errEl.textContent = message || "Kunne ikke indlæse billeder";
+        errEl.hidden = false;
       }
 
-      const layers = [layerA, layerB];
-
-      layers.forEach((layer) => {
-        if (!layer.classList.contains("slide-image")) {
-          layer.className = "slide-image";
-        }
-        layer.alt = "LD Studios billede";
-        layer.loading = "eager";
-        if (layer.id !== "slideshow-early") layer.decoding = "async";
-      });
-      layerA.fetchPriority = "high";
-      layerB.fetchPriority = "low";
-
-      async function loadSlideIntoLayer(layer, slideIndex) {
+      function loadInto(layer, slideIndex) {
         const url = SLIDESHOW_SOURCES[slideIndex];
         if (
           layer.dataset.slideIndexStored === String(slideIndex)
           && layer.complete
           && layer.naturalWidth > 0
         ) {
-          return true;
+          return Promise.resolve(true);
         }
 
         layer.dataset.slideIndexStored = String(slideIndex);
         layer.src = url;
 
-        const ok = await new Promise((resolve) => {
+        return new Promise((resolve) => {
           if (layer.complete && layer.naturalWidth > 0) {
             resolve(true);
             return;
@@ -632,97 +633,73 @@
           layer.onload = () => resolve(layer.naturalWidth > 0);
           layer.onerror = () => resolve(false);
         });
-
-        return ok;
       }
 
-      async function resolveNextSlide(fromIndex, layer) {
+      async function pickFirstSlideIndex(layer) {
         const n = SLIDESHOW_SOURCES.length;
-        let pick = fromIndex % n;
+        for (let i = 0; i < n; i += 1) {
+          if (await loadInto(layer, i)) return i;
+        }
+        return -1;
+      }
+
+      async function loadFirstAvailable(layer, startIndex) {
+        const n = SLIDESHOW_SOURCES.length;
+        let pick = startIndex % n;
         for (let tries = 0; tries < n; tries += 1) {
-          if (await loadSlideIntoLayer(layer, pick)) return pick;
+          if (await loadInto(layer, pick)) return pick;
           pick = (pick + 1) % n;
         }
         return -1;
       }
 
-      function clearInlineTransition(el) {
-        el.style.removeProperty("transition");
+      function setFront(layerArrayIndex) {
+        layers.forEach((layer, i) => layer.classList.toggle("is-front", i === layerArrayIndex));
       }
 
-      function revealStandbyNoFade(standby) {
-        standby.style.transition = "none";
-        standby.classList.add("active");
-        standby.offsetHeight;
-        clearInlineTransition(standby);
-      }
-
-      function crossfade(activeIdx, instant) {
-        const cur = layers[activeIdx];
-        const standby = layers[1 - activeIdx];
-
-        if (instant) {
-          layerA.style.transition = "none";
-          layerB.style.transition = "none";
-          standby.classList.add("active");
-          cur.classList.remove("active");
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              clearInlineTransition(layerA);
-              clearInlineTransition(layerB);
-            });
-          });
-          return;
-        }
-
-        requestAnimationFrame(() => {
-          revealStandbyNoFade(standby);
-          cur.classList.remove("active");
-        });
+      function prefetchSlideIndex(i) {
+        const n = SLIDESHOW_SOURCES.length;
+        if (i < 0 || i >= n) return;
+        const pre = new Image();
+        pre.decoding = "async";
+        pre.src = SLIDESHOW_SOURCES[i];
       }
 
       (async () => {
         const n = SLIDESHOW_SOURCES.length;
 
-        const firstSlide = await resolveNextSlide(0, layerA);
-        if (firstSlide < 0) {
-          empty.textContent = "Kunne ikke indlæse billeder";
-          empty.style.display = "";
-          frame.replaceChildren();
+        const first = await pickFirstSlideIndex(a);
+        if (first < 0) {
+          showLoadError();
           return;
         }
 
-        slideshowIndex = firstSlide;
-        layerB.classList.remove("active");
-        revealStandbyNoFade(layerA);
-        empty.style.display = "none";
-
-        function prefetchSlideIndex(i) {
-          if (i < 0 || i >= n) return;
-          const pre = new Image();
-          pre.src = SLIDESHOW_SOURCES[i];
-        }
-
-        prefetchSlideIndex(1 % n);
-        setTimeout(() => prefetchSlideIndex(2 % n), 400);
+        slideshowIndex = first;
+        setFront(0);
+        errEl.hidden = true;
 
         if (n === 1) return;
-
-        let activeIdx = 0;
 
         const wait = (ms) =>
           new Promise((resolve) => {
             slideshowTimer = setTimeout(resolve, ms);
           });
 
+        prefetchSlideIndex((slideshowIndex + 1) % n);
+        prefetchSlideIndex((slideshowIndex + 2) % n);
+
+        let visibleLayerIx = 0;
+
         while (true) {
           await wait(5000);
-          const standby = layers[1 - activeIdx];
-          const picked = await resolveNextSlide((slideshowIndex + 1) % n, standby);
+          const standbyLayerIx = 1 - visibleLayerIx;
+          const standby = layers[standbyLayerIx];
+          const picked = await loadFirstAvailable(standby, (slideshowIndex + 1) % n);
+
           if (picked < 0) continue;
 
-          crossfade(activeIdx, false);
-          activeIdx = 1 - activeIdx;
+          setFront(standbyLayerIx);
+          visibleLayerIx = standbyLayerIx;
           slideshowIndex = picked;
 
           prefetchSlideIndex((slideshowIndex + 2) % n);

@@ -353,17 +353,77 @@
     <div class="upcoming-bookings-list" id="upcoming-bookings-list"></div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const BRUGE_SUPABASE = false;
-    let SUPABASE_URL = "";
-    let SUPABASE_ANON_KEY = "";
+    const BRUGE_SUPABASE = true;
+    const SUPABASE_URL = "https://vvrruinrupnginlkixeq.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_YbvhilZ2n49AVN1VWZvEuw_1vjQP-mk";
 
     async function initSupabase() {
       if (BRUGE_SUPABASE) {
-        return getMock();
+        try {
+          return await getLiveSupabaseData();
+        } catch (error) {
+          console.error("Supabase fetch failed, using mock data:", error);
+          return getMock();
+        }
       } else {
         return getMock();
       }
+    }
+
+    async function getLiveSupabaseData() {
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const { data: studios, error: studiosError } = await client
+        .from("Studio")
+        .select("id,name");
+      if (studiosError) {
+        throw studiosError;
+      }
+
+      const { data: bookingsRaw, error: bookingsError } = await client
+        .from("Booking")
+        .select("*")
+        .eq("status", "Confirmed")
+        .order("startTime", { ascending: true });
+      if (bookingsError) {
+        throw bookingsError;
+      }
+
+      const rooms = (studios || []).map((studio) => ({
+        id: `studio-${studio.id}`,
+        name: studio.name
+      }));
+
+      const bookings = (bookingsRaw || [])
+        .map((booking) => {
+          const studioId =
+            booking.studioId ||
+            booking.studio_id ||
+            booking.room_id ||
+            booking.roomId ||
+            booking.StudioId;
+
+          if (!studioId || !booking.startTime || !booking.endTime) {
+            return null;
+          }
+
+          return {
+            room_id: `studio-${studioId}`,
+            start_time: new Date(booking.startTime).toISOString(),
+            end_time: new Date(booking.endTime).toISOString(),
+            title: booking.title || booking.name || "Booking",
+            status: "confirmed"
+          };
+        })
+        .filter(Boolean);
+
+      if (!rooms.length) {
+        throw new Error("No studios returned from Supabase.");
+      }
+
+      return { rooms, bookings };
     }
 
     function getMock() {

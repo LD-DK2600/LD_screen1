@@ -120,14 +120,54 @@
       overflow: hidden;
     }
 
+    .floorplan-wrap {
+      position: relative;
+      width: fit-content;
+      height: fit-content;
+      max-width: 94%;
+      max-height: 94%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
     .studio-visual img {
       width: auto;
       height: auto;
-      max-width: 94%;
-      max-height: 94%;
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
       object-position: center center;
       border-radius: 12px;
+    }
+
+    .entry-diode {
+      position: absolute;
+      top: 20.7%;
+      left: 49.4%;
+      width: 0.95vw;
+      height: 0.95vw;
+      min-width: 8px;
+      min-height: 8px;
+      max-width: 16px;
+      max-height: 16px;
+      border-radius: 50%;
+      background: #ff3030;
+      border: 1px solid #ff8f8f;
+      box-shadow: 0 0 0 rgba(255, 48, 48, 0.9);
+      animation: diodeBlink 1.2s infinite ease-in-out;
+      pointer-events: none;
+    }
+
+    @keyframes diodeBlink {
+      0%, 100% {
+        opacity: 0.4;
+        box-shadow: 0 0 4px rgba(255, 48, 48, 0.35);
+      }
+      50% {
+        opacity: 1;
+        box-shadow: 0 0 14px rgba(255, 48, 48, 0.95);
+      }
     }
 
     .side-empty-box {
@@ -245,6 +285,11 @@
         padding: 2vw;
       }
 
+      .entry-diode {
+        width: 2.3vw;
+        height: 2.3vw;
+      }
+
       .side-empty-box {
         min-height: 12vh;
       }
@@ -292,7 +337,10 @@
 
   <main>
     <div class="studio-visual">
-      <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout">
+      <div class="floorplan-wrap">
+        <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout">
+        <div class="entry-diode" aria-hidden="true"></div>
+      </div>
     </div>
     <div class="side-empty-box" aria-label="Tom informationsboks"></div>
 

@@ -389,8 +389,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const BRUGE_SUPABASE = true;
-    const SUPABASE_URL = "https://vvrruinrupnginlkixeq.supabase.co";
+    /** Ingen trailing slash — ellers kan klienten give mærkelige 404. */
+    const SUPABASE_URL = "https://vvrruinrupnginlkixeq.supabase.co".replace(/\/+$/, "");
+    /** Brug **Project API key → anon public** (klassisk `eyJ...` JWT), ikke service role. `sb_publishable_` virker kun hvis det matcher dit projekt. */
     const SUPABASE_ANON_KEY = "sb_publishable_YbvhilZ2n49AVN1VWZvEuw_1vjQP-mk";
+    /** Prøves i rækkefølge indtil REST ikke svarer med “relation not found” (404 / PGRST205). */
+    const SUPABASE_TABLE_STUDIO = ["Studio", "studio", "Studios", "studios"];
+    const SUPABASE_TABLE_BOOKING = ["Booking", "booking", "Bookings", "bookings"];
+    const SUPABASE_TABLE_CUSTOMER = ["Customer", "customer", "Customers", "customers"];
     const DEFAULT_STUDIOS = [
       { id: "studio-1", name: "Studie 1" },
       { id: "studio-2", name: "Studie 2" },
@@ -413,9 +419,41 @@
 
     function getSupabaseClient() {
       if (!supabaseClientSingleton && window.supabase && typeof window.supabase.createClient === "function") {
-        supabaseClientSingleton = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseClientSingleton = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+        });
       }
       return supabaseClientSingleton;
+    }
+
+    function isMissingTableError(err) {
+      if (!err) return false;
+      const code = String(err.code || "");
+      const status = Number(err.status || err.statusCode || 0);
+      const msg = String(err.message || "").toLowerCase();
+      if (status === 404) return true;
+      if (code === "PGRST205" || code === "42P01") return true;
+      if (msg.includes("schema cache")) return true;
+      if (msg.includes("does not exist")) return true;
+      if (msg.includes("not find the table")) return true;
+      if (msg.includes("relation") && msg.includes("exist")) return true;
+      return false;
+    }
+
+    async function supabaseSelectFirstTable(client, candidates, columns) {
+      let lastErr = null;
+      for (let i = 0; i < candidates.length; i += 1) {
+        const name = candidates[i];
+        const { data, error } = await client.from(name).select(columns);
+        if (!error) {
+          if (i > 0) console.info("LD_screen1: bruger Supabase-tabel", JSON.stringify(name));
+          return { rows: data || [], table: name };
+        }
+        lastErr = error;
+        if (isMissingTableError(error)) continue;
+        throw error;
+      }
+      throw lastErr || new Error(`Ingen af tabellerne virkede: ${candidates.join(", ")}`);
     }
 
     async function initSupabase() {
@@ -453,28 +491,31 @@
         throw new Error("Supabase SDK ikke tilgængelig");
       }
 
-      const { data: studios, error: studiosError } = await client.from("Studio").select("id,name");
-      if (studiosError) {
-        throw studiosError;
+      let studios = [];
+      try {
+        const sr = await supabaseSelectFirstTable(client, SUPABASE_TABLE_STUDIO, "id,name");
+        studios = sr.rows;
+      } catch (e) {
+        if (isMissingTableError(e)) {
+          console.warn("LD_screen1: ingen Studio-tabel fundet — forsætter med bookinger alene:", e.message || e);
+        } else {
+          throw e;
+        }
       }
 
-      const { data: bookingsRaw, error: bookingsError } = await client.from("Booking").select("*");
-      if (bookingsError) {
-        throw bookingsError;
-      }
+      const br = await supabaseSelectFirstTable(client, SUPABASE_TABLE_BOOKING, "*");
+      const bookingsRaw = br.rows;
 
       let customerNameById = new Map();
       try {
-        const { data: customers, error: customersError } = await client
-          .from("Customer")
-          .select("id,name");
-        if (!customersError && Array.isArray(customers)) {
-          customerNameById = new Map(customers.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
-        } else if (customersError) {
-          console.warn("Customer table not available for anon:", customersError.message);
-        }
+        const cr = await supabaseSelectFirstTable(client, SUPABASE_TABLE_CUSTOMER, "id,name");
+        customerNameById = new Map(cr.rows.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
       } catch (error) {
-        console.warn("Customer lookup failed, continuing without customer names:", error);
+        if (isMissingTableError(error)) {
+          console.warn("LD_screen1: Customer ikke tilgængelig eller andet navn — fortsætter uden lookup.");
+        } else {
+          console.warn("Customer lookup:", error.message || error);
+        }
       }
 
       const rooms = (studios || [])

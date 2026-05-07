@@ -198,6 +198,26 @@
       line-height: 1.35;
     }
 
+    .video-feed-open {
+      position: absolute;
+      top: 0.6vw;
+      right: 0.6vw;
+      z-index: 4;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35em 0.75em;
+      border-radius: 8px;
+      border: 1px solid rgba(157, 181, 230, 0.45);
+      color: #eaf1ff;
+      background: rgba(8, 12, 20, 0.65);
+      text-decoration: none;
+      font-size: 0.72vw;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(2px);
+    }
+
     footer {
       background: linear-gradient(180deg, rgba(16, 23, 37, 0.96), rgba(10, 16, 27, 0.98));
       border-top: 1px solid var(--border-color);
@@ -331,6 +351,12 @@
         bottom: 1.2vw;
       }
 
+      .video-feed-open {
+        font-size: 1.9vw;
+        top: 1.2vw;
+        right: 1.2vw;
+      }
+
       footer {
         padding: 3vw;
         margin: 0 3vw 3vw;
@@ -398,6 +424,7 @@
           referrerpolicy="no-referrer"
           hidden>
         </iframe>
+        <a id="video-feed-open" class="video-feed-open" href="#" target="_blank" rel="noopener noreferrer" hidden>Aabn feed</a>
         <p class="video-feed-status" id="video-feed-status" hidden></p>
       </div>
     </div>
@@ -732,8 +759,9 @@
     function initVideoFeed() {
       const video = document.getElementById("video-feed-player");
       const embed = document.getElementById("video-feed-embed");
+      const openLink = document.getElementById("video-feed-open");
       const statusEl = document.getElementById("video-feed-status");
-      if (!video || !embed || !statusEl) return;
+      if (!video || !embed || !openLink || !statusEl) return;
 
       const showStatus = (text) => {
         statusEl.textContent = text;
@@ -761,15 +789,26 @@
       if (!looksLikeDirectVideo) {
         video.hidden = true;
         embed.hidden = false;
+        openLink.hidden = false;
+        openLink.href = feedUrl;
         embed.src = feedUrl;
         showStatus("Indlæser web-feed...");
+
+        let iframeLoaded = false;
         embed.addEventListener("load", () => {
+          iframeLoaded = true;
           hideStatus();
         }, { once: true });
+
+        setTimeout(() => {
+          if (iframeLoaded) return;
+          showStatus("Web-feed kan ikke indlejres her (browseren blokerer det). Brug knappen 'Aabn feed'.");
+        }, 4500);
         return;
       }
 
       embed.hidden = true;
+      openLink.hidden = true;
       video.hidden = false;
       video.src = feedUrl;
       video.play().catch(() => {

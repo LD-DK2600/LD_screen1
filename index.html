@@ -757,15 +757,37 @@
     }
 
     function initVideoFeed() {
+      const frame = document.getElementById("video-feed-frame");
       const video = document.getElementById("video-feed-player");
       const embed = document.getElementById("video-feed-embed");
       const openLink = document.getElementById("video-feed-open");
       const statusEl = document.getElementById("video-feed-status");
-      if (!video || !embed || !openLink || !statusEl) return;
+      if (!frame || !video || !embed || !openLink || !statusEl) return;
 
       const showStatus = (text) => {
         statusEl.textContent = text;
         statusEl.hidden = false;
+      };
+      const setStatusMode = (centered) => {
+        if (centered) {
+          statusEl.style.top = "50%";
+          statusEl.style.bottom = "auto";
+          statusEl.style.transform = "translate(-50%, -50%)";
+          statusEl.style.fontSize = "0.9vw";
+          openLink.style.top = "62%";
+          openLink.style.right = "auto";
+          openLink.style.left = "50%";
+          openLink.style.transform = "translateX(-50%)";
+        } else {
+          statusEl.style.top = "";
+          statusEl.style.bottom = "";
+          statusEl.style.transform = "";
+          statusEl.style.fontSize = "";
+          openLink.style.top = "";
+          openLink.style.right = "";
+          openLink.style.left = "";
+          openLink.style.transform = "";
+        }
       };
 
       const feedUrl = String(VIDEO_FEED_URL || "").trim();
@@ -792,11 +814,15 @@
         embed.hidden = true;
         openLink.hidden = false;
         openLink.href = feedUrl;
-        showStatus("UniFi share-link kan ikke vises stabilt i denne ramme. Brug 'Aabn feed'.");
+        setStatusMode(true);
+        frame.style.background =
+          "linear-gradient(150deg, rgba(32, 44, 70, 0.92), rgba(10, 15, 26, 0.96))";
+        showStatus("Live feed aabnes i ny fane");
         return;
       }
 
       if (!looksLikeDirectVideo) {
+        setStatusMode(false);
         video.hidden = true;
         embed.hidden = false;
         openLink.hidden = false;
@@ -819,6 +845,7 @@
 
       embed.hidden = true;
       openLink.hidden = true;
+      setStatusMode(false);
       video.hidden = false;
       video.src = feedUrl;
       video.play().catch(() => {

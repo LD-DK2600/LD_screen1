@@ -155,6 +155,36 @@
       max-width: 90%;
     }
 
+    .slideshow-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      background: radial-gradient(ellipse at center, rgba(42, 54, 82, 0.5) 0%, rgba(16, 23, 37, 0.85) 100%);
+    }
+
+    .slideshow-layer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center center;
+      border-radius: 16px;
+      opacity: 0;
+      transition: opacity 2000ms linear;
+      will-change: opacity;
+      pointer-events: none;
+      background: #05070d;
+    }
+
+    .slideshow-layer.is-visible {
+      opacity: 1;
+    }
+
     footer {
       background: linear-gradient(180deg, rgba(16, 23, 37, 0.96), rgba(10, 16, 27, 0.98));
       border-top: 1px solid var(--border-color);
@@ -280,6 +310,11 @@
         padding: 2vw;
       }
 
+      .slideshow-layer,
+      .slideshow-frame {
+        border-radius: 14px;
+      }
+
       footer {
         padding: 3vw;
         margin: 0 3vw 3vw;
@@ -329,8 +364,12 @@
     <div class="studio-visual">
       <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" fetchpriority="high" decoding="async">
     </div>
-    <div class="side-empty-box" aria-label="Tom boks">
-      <div class="side-placeholder"> </div>
+    <div class="side-empty-box" aria-label="Billedeshow">
+      <div class="slideshow-frame" id="slideshow-frame">
+        <img id="slideshow-a" class="slideshow-layer is-visible" alt="LD Studios" decoding="async" loading="eager">
+        <img id="slideshow-b" class="slideshow-layer" alt="" decoding="async" loading="eager">
+      </div>
+      <div class="side-placeholder" id="slideshow-fallback" hidden>Indlæser billeder...</div>
     </div>
 
   </main>
@@ -357,6 +396,11 @@
       { id: "studio-3", name: "Studie 3" },
       { id: "studio-4", name: "Studie 4" }
     ];
+
+    const SLIDESHOW_FOLDER = "slideshow-opt";
+    const SLIDESHOW_MANIFEST = `${SLIDESHOW_FOLDER}/manifest.json`;
+    const SLIDE_SHOW_MS = 5000; // tid pr billede (uden fade)
+    const SLIDE_FADE_MS = 2000; // fade transition
     /** Én klient til hele fanen — undgår "Multiple GoTrueClient instances"-advarslen. */
     let supabaseClientSingleton = null;
 
@@ -659,8 +703,122 @@
       setTimeout(clock, 1000 * 30);
     }
 
+    async function initSlideshow() {
+      const frame = document.getElementById("slideshow-frame");
+      const imgA = document.getElementById("slideshow-a");
+      const imgB = document.getElementById("slideshow-b");
+      const fallback = document.getElementById("slideshow-fallback");
+      if (!frame || !imgA || !imgB) return;
+
+      const showFallback = (text) => {
+        if (!fallback) return;
+        fallback.textContent = text || "Indlæser billeder...";
+        fallback.hidden = false;
+      };
+      const hideFallback = () => {
+        if (!fallback) return;
+        fallback.hidden = true;
+      };
+
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      const loadImage = (el, url, timeoutMs = 10000) =>
+        new Promise((resolve) => {
+          let done = false;
+          const finish = (ok) => {
+            if (done) return;
+            done = true;
+            el.onload = null;
+            el.onerror = null;
+            resolve(ok);
+          };
+          el.onload = () => finish(true);
+          el.onerror = () => finish(false);
+          el.src = url;
+          if (el.complete && el.naturalWidth > 0) finish(true);
+          setTimeout(() => finish(false), timeoutMs);
+        });
+
+      async function fetchManifestUrls() {
+        try {
+          const res = await fetch(SLIDESHOW_MANIFEST, { cache: "no-store" });
+          if (!res.ok) throw new Error(`manifest ${res.status}`);
+          const json = await res.json();
+          const files = Array.isArray(json?.files) ? json.files : [];
+          return files
+            .map((f) => String(f || "").trim())
+            .filter(Boolean)
+            .map((f) => (f.includes("/") ? f : `${SLIDESHOW_FOLDER}/${encodeURI(f)}`));
+        } catch (e) {
+          console.warn("Slideshow: kunne ikke hente manifest:", e);
+          return [];
+        }
+      }
+
+      const urls = await fetchManifestUrls();
+      if (urls.length === 0) {
+        showFallback("Ingen billeder i slideshow-mappen.");
+        return;
+      }
+
+      // Find første billede der kan loades
+      showFallback("Indlæser billeder...");
+      let startIx = -1;
+      for (let i = 0; i < urls.length; i += 1) {
+        if (await loadImage(imgA, urls[i])) {
+          startIx = i;
+          break;
+        }
+      }
+      if (startIx < 0) {
+        showFallback("Kunne ikke indlæse billeder.");
+        return;
+      }
+
+      hideFallback();
+      imgA.classList.add("is-visible");
+      imgB.classList.remove("is-visible");
+
+      let front = imgA;
+      let back = imgB;
+      let ix = startIx;
+
+      // uendelig loop: 5s visning + 2s fade
+      while (true) {
+        await wait(SLIDE_SHOW_MS);
+
+        // preload næste (spring fejl over)
+        let nextIx = (ix + 1) % urls.length;
+        let ok = false;
+        for (let tries = 0; tries < urls.length; tries += 1) {
+          ok = await loadImage(back, urls[nextIx]);
+          if (ok) break;
+          nextIx = (nextIx + 1) % urls.length;
+        }
+        if (!ok) {
+          showFallback("Ingen billeder kunne indlæses.");
+          return;
+        }
+
+        // start fade
+        requestAnimationFrame(() => {
+          back.classList.add("is-visible");
+          front.classList.remove("is-visible");
+        });
+
+        await wait(SLIDE_FADE_MS);
+
+        // swap buffers
+        ix = nextIx;
+        const tmp = front;
+        front = back;
+        back = tmp;
+      }
+    }
+
 
     document.addEventListener("DOMContentLoaded", () => {
+      initSlideshow();
       clock();
     });
   </script>

@@ -146,76 +146,13 @@
       align-self: stretch;
     }
 
-    .video-feed-frame {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 2;
-      background: radial-gradient(ellipse at center, rgba(42, 54, 82, 0.5) 0%, rgba(16, 23, 37, 0.85) 100%);
-      overflow: hidden;
-      border-radius: 16px;
-    }
-
-    .video-feed-player {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center center;
-      border-radius: 16px;
-      background: #05070d;
-    }
-
-    .video-feed-embed {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 233%;
-      height: 233%;
-      transform: translate(-50%, -56%);
-      border: 0;
-      border-radius: 16px;
-      background: #05070d;
-    }
-
-    .video-feed-status {
-      position: absolute;
-      bottom: 0.5vw;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 3;
-      margin: 0;
-      font-size: 0.72vw;
-      color: #c9d5f5;
-      background: rgba(6, 10, 18, 0.65);
-      padding: 0.3em 0.75em;
-      border-radius: 8px;
-      max-width: 92%;
-      text-align: center;
-      line-height: 1.35;
-    }
-
-    .video-feed-open {
-      position: absolute;
-      top: 0.6vw;
-      right: 0.6vw;
-      z-index: 4;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.35em 0.75em;
-      border-radius: 8px;
-      border: 1px solid rgba(157, 181, 230, 0.45);
-      color: #eaf1ff;
-      background: rgba(8, 12, 20, 0.65);
-      text-decoration: none;
-      font-size: 0.72vw;
-      font-weight: 600;
+    .side-placeholder {
+      color: #8ea0c8;
+      font-size: 0.95vw;
       letter-spacing: 0.02em;
-      backdrop-filter: blur(2px);
+      text-align: center;
+      padding: 1vw;
+      max-width: 90%;
     }
 
     footer {
@@ -338,23 +275,9 @@
         min-height: 12vh;
       }
 
-      .video-feed-player {
-        border-radius: 14px;
-      }
-
-      .video-feed-embed {
-        border-radius: 14px;
-      }
-
-      .video-feed-status {
-        font-size: 2.2vw;
-        bottom: 1.2vw;
-      }
-
-      .video-feed-open {
-        font-size: 1.9vw;
-        top: 1.2vw;
-        right: 1.2vw;
+      .side-placeholder {
+        font-size: 2.8vw;
+        padding: 2vw;
       }
 
       footer {
@@ -406,34 +329,8 @@
     <div class="studio-visual">
       <img src="https://ld-dk2600.github.io/LD_screen1/LDstudiiosmap.png" alt="Studio Layout" fetchpriority="high" decoding="async">
     </div>
-    <div class="side-empty-box" aria-label="Live video feed">
-      <div class="video-feed-frame" id="video-feed-frame">
-        <video
-          id="video-feed-player"
-          class="video-feed-player"
-          autoplay
-          muted
-          playsinline
-          controls
-          preload="none">
-        </video>
-        <iframe
-          id="video-feed-embed-a"
-          class="video-feed-embed"
-          title="Live video feed"
-          referrerpolicy="no-referrer"
-          hidden>
-        </iframe>
-        <iframe
-          id="video-feed-embed-b"
-          class="video-feed-embed"
-          title="Live video feed"
-          referrerpolicy="no-referrer"
-          hidden>
-        </iframe>
-        <a id="video-feed-open" class="video-feed-open" href="#" target="_blank" rel="noopener noreferrer" hidden>Aabn feed</a>
-        <p class="video-feed-status" id="video-feed-status" hidden></p>
-      </div>
+    <div class="side-empty-box" aria-label="Tom boks">
+      <div class="side-placeholder"> </div>
     </div>
 
   </main>
@@ -460,7 +357,6 @@
       { id: "studio-3", name: "Studie 3" },
       { id: "studio-4", name: "Studie 4" }
     ];
-    const VIDEO_FEED_URL = "https://monitor.ui.com/2198cd0c-0fa1-4a11-a341-4d17ee25cc1e";
     /** Én klient til hele fanen — undgår "Multiple GoTrueClient instances"-advarslen. */
     let supabaseClientSingleton = null;
 
@@ -763,157 +659,8 @@
       setTimeout(clock, 1000 * 30);
     }
 
-    function initVideoFeed() {
-      const frame = document.getElementById("video-feed-frame");
-      const video = document.getElementById("video-feed-player");
-      const embedA = document.getElementById("video-feed-embed-a");
-      const embedB = document.getElementById("video-feed-embed-b");
-      const openLink = document.getElementById("video-feed-open");
-      const statusEl = document.getElementById("video-feed-status");
-      if (!frame || !video || !embedA || !embedB || !openLink || !statusEl) return;
-      const embeds = [embedA, embedB];
-
-      const showStatus = (text) => {
-        statusEl.textContent = text;
-        statusEl.hidden = false;
-      };
-      const hideStatus = () => {
-        statusEl.hidden = true;
-      };
-      const setStatusMode = (centered) => {
-        if (centered) {
-          statusEl.style.top = "50%";
-          statusEl.style.bottom = "auto";
-          statusEl.style.transform = "translate(-50%, -50%)";
-          statusEl.style.fontSize = "0.9vw";
-          openLink.style.top = "62%";
-          openLink.style.right = "auto";
-          openLink.style.left = "50%";
-          openLink.style.transform = "translateX(-50%)";
-        } else {
-          statusEl.style.top = "";
-          statusEl.style.bottom = "";
-          statusEl.style.transform = "";
-          statusEl.style.fontSize = "";
-          openLink.style.top = "";
-          openLink.style.right = "";
-          openLink.style.left = "";
-          openLink.style.transform = "";
-        }
-      };
-
-      const feedUrl = String(VIDEO_FEED_URL || "").trim();
-      if (!feedUrl) {
-        showStatus("Video feed URL mangler.");
-        return;
-      }
-
-      const lowerUrl = feedUrl.toLowerCase();
-      const looksLikeDirectVideo =
-        lowerUrl.endsWith(".m3u8")
-        || lowerUrl.endsWith(".mp4")
-        || lowerUrl.endsWith(".webm")
-        || lowerUrl.includes(".m3u8?");
-      const isUnifiMonitorShare = lowerUrl.includes("monitor.ui.com/");
-
-      if (feedUrl.startsWith("rtsp://") || feedUrl.startsWith("rtsps://")) {
-        showStatus("RTSP/RTSPS kan ikke afspilles direkte i browser. Brug HLS (.m3u8), WebRTC eller en gateway.");
-        return;
-      }
-
-      if (!looksLikeDirectVideo) {
-        const retryMs = isUnifiMonitorShare ? 20000 : 0;
-        setStatusMode(isUnifiMonitorShare);
-        video.hidden = true;
-        openLink.hidden = false;
-        openLink.href = feedUrl;
-        if (isUnifiMonitorShare) {
-          frame.style.background =
-            "linear-gradient(150deg, rgba(32, 44, 70, 0.92), rgba(10, 15, 26, 0.96))";
-        }
-
-        let activeEmbedIx = 0;
-        embeds[0].hidden = false;
-        embeds[1].hidden = true;
-
-        const loadInto = (iframe, url) =>
-          new Promise((resolve) => {
-            let done = false;
-            const finish = (ok) => {
-              if (done) return;
-              done = true;
-              iframe.removeEventListener("load", onLoad);
-              resolve(ok);
-            };
-            const onLoad = () => finish(true);
-            iframe.addEventListener("load", onLoad, { once: true });
-            iframe.src = url;
-            setTimeout(() => finish(false), 4500);
-          });
-
-        const attemptSwap = async () => {
-          const standbyIx = 1 - activeEmbedIx;
-          const standby = embeds[standbyIx];
-          const active = embeds[activeEmbedIx];
-
-          standby.hidden = false; // så browseren rent faktisk renderer
-          standby.style.opacity = "0";
-          standby.style.pointerEvents = "none";
-
-          const url = `${feedUrl}${feedUrl.includes("?") ? "&" : "?"}embedTry=${Date.now()}`;
-          showStatus("Indlæser web-feed...");
-          const ok = await loadInto(standby, url);
-
-          if (!ok) {
-            standby.hidden = true;
-            standby.src = "about:blank";
-            if (isUnifiMonitorShare) {
-              showStatus("Feed virker ikke lige nu. Prøver igen automatisk — eller brug 'Aabn feed'.");
-            } else {
-              showStatus("Web-feed kan ikke indlejres her (browseren blokerer det). Brug knappen 'Aabn feed'.");
-            }
-            return;
-          }
-
-          // swap
-          hideStatus();
-          standby.style.opacity = "";
-          standby.style.pointerEvents = "";
-          active.hidden = true;
-          active.src = "about:blank";
-          activeEmbedIx = standbyIx;
-        };
-
-        // first attempt (keep previous visible if it was already visible)
-        attemptSwap();
-
-        if (retryMs > 0) {
-          setInterval(() => {
-            if (document.hidden) return;
-            attemptSwap();
-          }, retryMs);
-        }
-        return;
-      }
-
-      embeds.forEach((e) => {
-        e.hidden = true;
-        e.src = "about:blank";
-      });
-      openLink.hidden = true;
-      setStatusMode(false);
-      video.hidden = false;
-      video.src = feedUrl;
-      video.play().catch(() => {
-        showStatus("Kunne ikke starte video-feed automatisk.");
-      });
-      video.addEventListener("error", () => {
-        showStatus("Video feed kunne ikke indlæses.");
-      });
-    }
 
     document.addEventListener("DOMContentLoaded", () => {
-      initVideoFeed();
       clock();
     });
   </script>

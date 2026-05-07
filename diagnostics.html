@@ -142,6 +142,7 @@
     <div class="sub">Kører read-only tests mod Supabase og viser præcis hvor mapping/permissions fejler.</div>
   </header>
   <main>
+    <section class="card" id="summaryCard"></section>
     <section class="card" id="connCard"></section>
     <section class="card" id="tableCard"></section>
     <section class="card" id="rlsCard"></section>
@@ -248,6 +249,62 @@
       navigator.clipboard.writeText(text).catch(() => {});
     }
 
+    const diagState = {
+      consoleErrors: [],
+      conn: { status: "ukendt", text: "" },
+      table: { status: "ukendt", bookingName: "nej", studioName: "nej", bookingCount: 0, studioCount: 0 },
+      rls: { status: "ukendt", warning: "nej", hasSqlButton: "nej" },
+      mapping: { status: "ukendt", fetched: 0, filtered: 0, afterFilter: 0, hasSamples: "nej" },
+      time: { status: "ukendt", timezone: "ukendt", todayCount: 0, hasCurrentDateBtn: "nej" },
+      studioMap: { status: "ukendt", counts: {}, mismatches: 0 },
+      preview: { status: "ukendt", now: [], next: [], none: [] }
+    };
+
+    const _origConsoleError = console.error.bind(console);
+    console.error = (...args) => {
+      try {
+        diagState.consoleErrors.push(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+      } catch (_) {
+        diagState.consoleErrors.push(String(args[0] || "Ukendt console-fejl"));
+      }
+      _origConsoleError(...args);
+    };
+
+    function renderSummaryCard() {
+      const summaryCard = document.getElementById("summaryCard");
+      if (!summaryCard) return;
+      const s = diagState;
+
+      const row6Counts = ["studio-1", "studio-2", "studio-3", "studio-4"]
+        .map((k) => `${k}: ${s.studioMap.counts[k] ?? 0}`)
+        .join(", ");
+      const mismatchText = s.studioMap.mismatches > 0 ? `ja/${s.studioMap.mismatches}` : "nej";
+      const consoleYesNo = s.consoleErrors.length > 0 ? "ja" : "nej";
+
+      const report = [
+        "Test 1 Resultater",
+        `Kort 1 (Forbindelse): ${s.conn.status} — ${s.conn.text}`,
+        `Kort 2 (Tabel-discovery): ${s.table.status} — booking=${s.table.bookingName} (${s.table.bookingCount}), studio=${s.table.studioName} (${s.table.studioCount})`,
+        `Kort 3 (RLS): ${s.rls.status} — warning=${s.rls.warning}, SQL-knap=${s.rls.hasSqlButton}`,
+        `Kort 4 (Booking feltmapping): ${s.mapping.status} — hentet=${s.mapping.fetched}, efter filter=${s.mapping.afterFilter}, udelukket=${s.mapping.filtered}, samples=${s.mapping.hasSamples}`,
+        `Kort 5 (Dato/tids): ${s.time.status} — timezone=${s.time.timezone}, bookinger i dag=${s.time.todayCount}, CURRENT_DATE-knap=${s.time.hasCurrentDateBtn}`,
+        `Kort 6 (Studio-mapping): ${s.studioMap.status} — ${row6Counts}, mismatches=${mismatchText}`,
+        `Kort 7 (Preview): ${s.preview.status} — "I studiet nu"=${s.preview.now.join("/") || "ingen"}, "Næste i dag"=${s.preview.next.join("/") || "ingen"}, "Ingen"=${s.preview.none.join("/") || "ingen"}`,
+        `Console fejl: ${consoleYesNo}`,
+        consoleYesNo === "ja" ? `Hvis ja: ${s.consoleErrors.slice(0, 5).join(" | ")}` : "Hvis ja: -"
+      ].join("\n");
+
+      summaryCard.innerHTML = `
+        <h2>0) Test 1 Summary <span class="badge ${consoleYesNo === "ja" ? "warn" : "ok"}">${consoleYesNo === "ja" ? "Har fejl" : "Klar"}</span></h2>
+        <div class="row">
+          <button id="copySummaryBtn">Copy Test 1 Resultater</button>
+        </div>
+        <pre id="summaryText">${esc(report)}</pre>
+      `;
+      const btn = document.getElementById("copySummaryBtn");
+      if (btn) btn.onclick = () => copyText(report);
+    }
+
     (async function runDiagnostics() {
       const connCard = document.getElementById("connCard");
       const tableCard = document.getElementById("tableCard");
@@ -283,6 +340,9 @@
           <div>${esc(connMessage)}</div>
         `
       );
+      diagState.conn.status = connOk ? "✅ grøn" : "❌ rød";
+      diagState.conn.text = connMessage;
+      renderSummaryCard();
 
       // 2) Table discovery
       const bookingProbe = await findFirstWorking(BOOKING_CANDIDATES);
@@ -333,6 +393,12 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
           ${jsonDetails("Booking feltnavne (sample row)", bookingCols)}
         `
       );
+      diagState.table.status = bookingProbe.chosen && studioProbe.chosen ? "✅ grøn" : "🟡 gul";
+      diagState.table.bookingName = bookingProbe.chosen?.name || "nej";
+      diagState.table.studioName = studioProbe.chosen?.name || "nej";
+      diagState.table.bookingCount = bookingProbe.chosen?.count ?? bookingProbe.chosen?.rows?.length ?? 0;
+      diagState.table.studioCount = studioProbe.chosen?.count ?? studioProbe.chosen?.rows?.length ?? 0;
+      renderSummaryCard();
 
       // 3) RLS / permission-check
       const errors = [...bookingProbe.results, ...studioProbe.results, ...customerProbe.results].map((r) => r.error).filter(Boolean);
@@ -357,6 +423,10 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
           ${jsonDetails("Fejlobjekter", errors)}
         `
       );
+      diagState.rls.status = permissionErrors.length ? "❌ rød" : (canGenerateRlsSql ? "✅ grøn" : "🟡 gul");
+      diagState.rls.warning = canGenerateRlsSql ? "nej" : "ja";
+      diagState.rls.hasSqlButton = canGenerateRlsSql ? "ja" : "nej";
+      renderSummaryCard();
 
       // 4) Booking mapping samples
       const bookingsRaw = bookingProbe.chosen?.rows || [];
@@ -425,6 +495,12 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
           ${jsonDetails("3 booking samples (raw + mapped)", sampleBookings)}
         `
       );
+      diagState.mapping.status = activeMappedBookings.length ? "✅ grøn" : "🟡 gul";
+      diagState.mapping.fetched = mappedBookings.length;
+      diagState.mapping.filtered = filteredOutCount;
+      diagState.mapping.afterFilter = activeMappedBookings.length;
+      diagState.mapping.hasSamples = sampleBookings.length > 0 ? "ja" : "nej";
+      renderSummaryCard();
 
       // 5) Date/time filter diagnostics
       const nowLocal = new Date();
@@ -460,6 +536,11 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
           ${jsonDetails("Parsed time sample", withParsed.slice(0, 5))}
         `
       );
+      diagState.time.status = "✅ grøn";
+      diagState.time.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "ukendt";
+      diagState.time.todayCount = todayCount;
+      diagState.time.hasCurrentDateBtn = "ja";
+      renderSummaryCard();
 
       // 6) Studio mapping tests
       const studioRows = EXPECTED_STUDIOS.map((sid) => {
@@ -486,6 +567,12 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
           })))}
         `
       );
+      diagState.studioMap.status = mismatches.length ? "🟡 gul" : "✅ grøn";
+      diagState.studioMap.mismatches = mismatches.length;
+      diagState.studioMap.counts = Object.fromEntries(
+        EXPECTED_STUDIOS.map((sid) => [sid, withParsed.filter((b) => b.room_id === sid).length])
+      );
+      renderSummaryCard();
 
       // 7) Rendering preview (same logic as production)
       const todayBookings = withParsed.filter((b) => {
@@ -550,6 +637,14 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
         "Preview",
         `<div class="grid-4">${previewHtml}</div>`
       );
+      diagState.preview.status = "✅ grøn";
+      previews.forEach((p, idx) => {
+        const sid = `studio-${idx + 1}`;
+        if (p.activeNow) diagState.preview.now.push(sid);
+        else if (p.next) diagState.preview.next.push(sid);
+        else diagState.preview.none.push(sid);
+      });
+      renderSummaryCard();
     })();
   </script>
 </body>

@@ -674,10 +674,40 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
 
       // 7) Rendering preview (studio-centric: Booking_Details -> Booking join)
       const bookingById = new Map(
-        activeMappedBookings
+        withParsed
           .filter((b) => b.bookingId != null)
           .map((b) => [String(b.bookingId), b])
       );
+      EXPECTED_STUDIOS.forEach((sid, i) => {
+        const roomId = String(i + 1);
+        console.log(`[K7] Studio ${roomId}:`);
+
+        const studioDetails = allBookingDetailsRows.filter((bd) => {
+          const rawStudioId = pickFirst(bd, ["studioId", "studio_id", "StudioId"]);
+          const rawSnapshot = pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
+          return (
+            String(rawStudioId) === roomId ||
+            String(rawStudioId) === sid ||
+            canonicalStudioIdFromAny(rawStudioId) === sid ||
+            canonicalStudioIdFromAny(rawSnapshot) === sid
+          );
+        });
+        console.log(`  - BookingDetails rows: ${studioDetails.length}`);
+
+        const bookingsForStudio = studioDetails
+          .map((bd) => {
+            const bookingId = pickFirst(bd, ["bookingId", "booking_id", "BookingId"]);
+            return withParsed.find((b) => String(pickFirst(b.raw, ["id", "bookingId", "booking_id", "BookingId"])) === String(bookingId));
+          })
+          .filter(Boolean);
+        console.log(`  - Bookings found: ${bookingsForStudio.length}`);
+
+        const todayBookings = bookingsForStudio.filter((b) => {
+          const start = new Date(b.startIso);
+          return start >= todayLocal && start < tomorrowLocal;
+        });
+        console.log(`  - Today: ${todayBookings.length}`);
+      });
       const nowTs = nowLocal.getTime();
       const previews = [1, 2, 3, 4].map((studioNum) => {
         const sid = `studio-${studioNum}`;

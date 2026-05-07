@@ -235,8 +235,23 @@
     }
 
     async function probeTable(name) {
-      const { data, error, count } = await client.from(name).select("*", { count: "exact", head: false }).limit(3);
-      return { name, rows: data || [], count: count ?? (Array.isArray(data) ? data.length : 0), error: error || null };
+      try {
+        console.log(`[diag] Probing table: ${name}`);
+        const { data, error, count, status, statusText } = await client
+          .from(name)
+          .select("*", { count: "exact", head: false })
+          .limit(3);
+        console.log(`[diag] ${name} result`, { data, error, count, status, statusText });
+        return {
+          name,
+          rows: data || [],
+          count: count ?? (Array.isArray(data) ? data.length : 0),
+          error: error || null
+        };
+      } catch (e) {
+        console.error(`[diag] ${name} exception`, e);
+        return { name, rows: [], count: 0, error: e };
+      }
     }
 
     async function findFirstWorking(candidates) {
@@ -311,6 +326,15 @@
     }
 
     (async function runDiagnostics() {
+      console.log("[diag] Starting diagnostics runtime info", {
+        href: window.location.href,
+        protocol: window.location.protocol,
+        origin: window.location.origin,
+        hasSupabaseUrl: !!SUPABASE_URL,
+        hasAnonKey: !!SUPABASE_ANON_KEY,
+        anonKeyPrefix: String(SUPABASE_ANON_KEY || "").slice(0, 12)
+      });
+
       const connCard = document.getElementById("connCard");
       const tableCard = document.getElementById("tableCard");
       const rlsCard = document.getElementById("rlsCard");

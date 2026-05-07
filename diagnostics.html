@@ -666,42 +666,51 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
       );
       renderSummaryCard();
 
-      // 7) Rendering preview (simpel model: Booking_Details -> join Booking -> filter i dag -> sort)
+      // 7) Rendering preview (studio-centric: Booking_Details -> Booking join)
       const bookingById = new Map(
-        withParsed
+        activeMappedBookings
           .filter((b) => b.bookingId != null)
           .map((b) => [String(b.bookingId), b])
       );
-      const previews = EXPECTED_STUDIOS.map((sid, i) => {
-        const roomName = `Studie ${i + 1}`;
+      const nowTs = nowLocal.getTime();
+      const previews = [1, 2, 3, 4].map((studioNum) => {
+        const sid = `studio-${studioNum}`;
+        const roomName = `Studie ${studioNum}`;
+
+        // 1) Filter Booking_Details for this studio
         const studioDetailsRows = allBookingDetailsRows.filter((bd) => {
-          const studioRef =
-            pickFirst(bd, ["studioId", "studio_id", "StudioId"]) ||
-            pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
-          return canonicalStudioIdFromAny(studioRef) === sid;
+          const studioIdRaw = pickFirst(bd, ["studioId", "studio_id", "StudioId"]);
+          const snapshot = pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
+          const studioIdAsCanonical =
+            canonicalStudioIdFromAny(studioIdRaw) || canonicalStudioIdFromAny(snapshot);
+          return studioIdAsCanonical === sid;
         });
 
-        const seenBookingIds = new Set();
-        const roomBookings = studioDetailsRows
+        // 2) Join Booking_Details -> Booking via bookingId
+        const roomBookingsJoined = studioDetailsRows
           .map((bd) => String(pickFirst(bd, ["bookingId", "booking_id", "BookingId"]) || ""))
-          .filter((id) => id && !seenBookingIds.has(id) && seenBookingIds.add(id))
-          .map((id) => bookingById.get(id))
           .filter(Boolean)
-          .filter((b) => {
-            const bookingDate = new Date(b.startIso);
-            return bookingDate >= todayLocal && bookingDate < tomorrowLocal;
-          })
-          .sort((a, b) => new Date(a.startIso) - new Date(b.startIso));
+          .map((bookingId) => bookingById.get(bookingId))
+          .filter(Boolean);
 
-        const nowTs = nowLocal.getTime();
-        const activeNow = roomBookings.find((b) => {
+        // 3) Filter to "today"
+        const roomBookingsToday = roomBookingsJoined.filter((b) => {
+          const bookingDate = new Date(b.startIso);
+          return bookingDate >= todayLocal && bookingDate < tomorrowLocal;
+        });
+
+        // 4) Sort by start time
+        roomBookingsToday.sort((a, b) => new Date(a.startIso) - new Date(b.startIso));
+
+        // 5) activeNow: start <= now < end
+        const activeNow = roomBookingsToday.find((b) => {
           const t0 = new Date(b.startIso).getTime();
           const t1 = new Date(b.endIso).getTime();
           return t0 <= nowTs && nowTs < t1;
         });
-        const next = activeNow ||
-          roomBookings.find((b) => new Date(b.startIso).getTime() > nowTs) ||
-          roomBookings[0];
+
+        // 6) next: first booking starting after now
+        const next = roomBookingsToday.find((b) => new Date(b.startIso).getTime() > nowTs) || null;
 
         return { roomName, activeNow, next };
       });

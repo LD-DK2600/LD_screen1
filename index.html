@@ -529,6 +529,20 @@
       return !blocked.has(s);
     }
 
+    function extractStudioNumber(value) {
+      const s = String(value || "").toLowerCase();
+      const m = s.match(/(?:studie|studio)\s*[-_#:]?\s*(\d{1,2})/i) || s.match(/\b(\d{1,2})\b/);
+      if (!m) return null;
+      const n = Number(m[1]);
+      if (!Number.isFinite(n) || n < 1 || n > 4) return null;
+      return n;
+    }
+
+    function canonicalStudioIdFromAny(value) {
+      const n = extractStudioNumber(value);
+      return n ? `studio-${n}` : null;
+    }
+
     async function getLiveSupabaseData() {
       const client = getSupabaseClient();
       if (!client) {
@@ -562,15 +576,24 @@
         }
       }
 
-      const rooms = (studios || [])
+      const studioIdToCanonical = new Map();
+      const roomsFromStudioTable = (studios || [])
         .filter((studio) => {
           const n = (studio.name || "").toLowerCase();
           return n.includes("studie") || n.includes("studio");
         })
-        .map((studio) => ({
-          id: `studio-${studio.id}`,
-          name: studio.name
-        }));
+        .map((studio) => {
+          const canonical =
+            canonicalStudioIdFromAny(studio.name) ||
+            canonicalStudioIdFromAny(studio.id) ||
+            `studio-${studio.id}`;
+          studioIdToCanonical.set(String(studio.id), canonical);
+          studioIdToCanonical.set(`studio-${studio.id}`, canonical);
+          return {
+            id: canonical,
+            name: studio.name
+          };
+        });
 
       const bookings = (bookingsRaw || [])
         .filter((b) => bookingStatusAllowed(pickFirst(b, ["status", "Status"])))
@@ -606,7 +629,12 @@
           }
 
           const sid = String(studioId).trim();
-          const room_id = sid.toLowerCase().startsWith("studio-") ? sid : `studio-${sid}`;
+          const studioNameInline = pickFirst(booking, ["studioName", "studio_name", "roomName", "room_name"]);
+          const room_id =
+            studioIdToCanonical.get(sid) ||
+            canonicalStudioIdFromAny(sid) ||
+            canonicalStudioIdFromAny(studioNameInline) ||
+            (sid.toLowerCase().startsWith("studio-") ? sid : `studio-${sid}`);
 
           const lookupName =
             (customerId != null && customerNameById.get(String(customerId))) || inlineName || null;
@@ -634,20 +662,22 @@
         );
       }
 
-      let displayRooms = rooms;
-      if (!displayRooms.length) {
-        if (bookings.length > 0) {
-          const uniq = [...new Set(bookings.map((b) => b.room_id))].sort();
-          displayRooms = uniq.map((id, idx) => ({
-            id,
-            name: `Studie ${idx + 1}`
-          }));
-        } else {
-          displayRooms = DEFAULT_STUDIOS;
-        }
-      }
+      const roomsById = new Map(DEFAULT_STUDIOS.map((r) => [r.id, { ...r }]));
+      roomsFromStudioTable.forEach((r) => {
+        const n = extractStudioNumber(r.id) || extractStudioNumber(r.name);
+        if (!n) return;
+        roomsById.set(`studio-${n}`, { id: `studio-${n}`, name: `Studie ${n}` });
+      });
 
-      return { rooms: displayRooms, bookings };
+      const canonicalRoomSet = new Set([...roomsById.keys()]);
+      const canonicalBookings = bookings.filter((b) => canonicalRoomSet.has(b.room_id));
+      const displayRooms = [...roomsById.values()].sort((a, b) => {
+        const na = extractStudioNumber(a.id) || 99;
+        const nb = extractStudioNumber(b.id) || 99;
+        return na - nb;
+      });
+
+      return { rooms: displayRooms, bookings: canonicalBookings };
     }
 
     function getEmptyStudioState() {

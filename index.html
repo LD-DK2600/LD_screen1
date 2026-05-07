@@ -742,6 +742,43 @@
 
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+      function isLikelyBlackFrame(imageEl) {
+        try {
+          const w = Math.max(8, Math.min(48, imageEl.naturalWidth || 0));
+          const h = Math.max(8, Math.min(48, imageEl.naturalHeight || 0));
+          if (!w || !h) return true;
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (!ctx) return false;
+
+          ctx.drawImage(imageEl, 0, 0, w, h);
+          const data = ctx.getImageData(0, 0, w, h).data;
+
+          let lumMin = 255;
+          let lumMax = 0;
+          let lumSum = 0;
+          const pxCount = w * h;
+
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const lum = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+            if (lum < lumMin) lumMin = lum;
+            if (lum > lumMax) lumMax = lum;
+            lumSum += lum;
+          }
+
+          const avg = lumSum / pxCount;
+          const range = lumMax - lumMin;
+          return avg < 8 && range < 6;
+        } catch (_) {
+          return false;
+        }
+      }
+
       const loadImage = (el, url, timeoutMs = 10000) =>
         new Promise((resolve) => {
           let done = false;
@@ -752,10 +789,12 @@
             el.onerror = null;
             resolve(ok);
           };
-          el.onload = () => finish(true);
+          el.onload = () => finish(el.naturalWidth > 0 && !isLikelyBlackFrame(el));
           el.onerror = () => finish(false);
           el.src = url;
-          if (el.complete && el.naturalWidth > 0) finish(true);
+          if (el.complete && el.naturalWidth > 0) {
+            finish(el.naturalWidth > 0 && !isLikelyBlackFrame(el));
+          }
           setTimeout(() => finish(false), timeoutMs);
         });
 

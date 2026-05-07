@@ -451,6 +451,13 @@
     const SLIDESHOW_MANIFEST = `${SLIDESHOW_FOLDER}/manifest.json`;
     const SLIDE_SHOW_MS = 5000; // tid pr billede (uden fade)
     const SLIDE_FADE_MS = 2000; // fade transition
+    const SLIDESHOW_SAFE_FALLBACK = [
+      "car-1.jpg",
+      "podcast-1.jpg",
+      "LD-table-mics.jpg",
+      "stream-3.jpg",
+      "stream-3b.jpg"
+    ].map((f) => `${SLIDESHOW_FOLDER}/${encodeURI(f)}`);
     /** Én klient til hele fanen — undgår "Multiple GoTrueClient instances"-advarslen. */
     let supabaseClientSingleton = null;
 
@@ -851,11 +858,26 @@
             .map((f) => (f.includes("/") ? f : `${SLIDESHOW_FOLDER}/${encodeURI(f)}`));
         } catch (e) {
           console.warn("Slideshow: kunne ikke hente manifest:", e);
-          return [];
+          return [...SLIDESHOW_SAFE_FALLBACK];
         }
       }
 
-      const urls = await fetchManifestUrls();
+      const urlsRaw = await fetchManifestUrls();
+      const urls = urlsRaw.filter((u) => {
+        const p = u.toLowerCase();
+        // Kendte sorte varianter kan ligge i cache fra ældre deploys
+        if (p.includes("/ld-slide-")) return false;
+        if (p.includes("/img-")) return false;
+        return true;
+      });
+      if (urls.length === 0) {
+        if (SLIDESHOW_SAFE_FALLBACK.length > 0) {
+          urls.push(...SLIDESHOW_SAFE_FALLBACK);
+        } else {
+          showFallback("Ingen billeder i slideshow-mappen.");
+          return;
+        }
+      }
       if (urls.length === 0) {
         showFallback("Ingen billeder i slideshow-mappen.");
         return;

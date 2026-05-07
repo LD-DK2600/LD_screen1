@@ -539,6 +539,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
 
         return {
           raw: booking,
+          bookingId: bookingId != null ? String(bookingId) : null,
           studioIdRaw,
           studioNameRaw,
           room_id,
@@ -665,16 +666,31 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
       );
       renderSummaryCard();
 
-      // 7) Rendering preview (same logic as production)
-      const todayBookings = withParsed.filter((b) => {
-        const bookingDate = new Date(b.startIso);
-        return bookingDate >= todayLocal && bookingDate < tomorrowLocal;
-      });
-
+      // 7) Rendering preview (simpel model: Booking_Details -> join Booking -> filter i dag -> sort)
+      const bookingById = new Map(
+        withParsed
+          .filter((b) => b.bookingId != null)
+          .map((b) => [String(b.bookingId), b])
+      );
       const previews = EXPECTED_STUDIOS.map((sid, i) => {
         const roomName = `Studie ${i + 1}`;
-        const roomBookings = todayBookings
-          .filter((b) => b.room_id === sid)
+        const studioDetailsRows = allBookingDetailsRows.filter((bd) => {
+          const studioRef =
+            pickFirst(bd, ["studioId", "studio_id", "StudioId"]) ||
+            pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
+          return canonicalStudioIdFromAny(studioRef) === sid;
+        });
+
+        const seenBookingIds = new Set();
+        const roomBookings = studioDetailsRows
+          .map((bd) => String(pickFirst(bd, ["bookingId", "booking_id", "BookingId"]) || ""))
+          .filter((id) => id && !seenBookingIds.has(id) && seenBookingIds.add(id))
+          .map((id) => bookingById.get(id))
+          .filter(Boolean)
+          .filter((b) => {
+            const bookingDate = new Date(b.startIso);
+            return bookingDate >= todayLocal && bookingDate < tomorrowLocal;
+          })
           .sort((a, b) => new Date(a.startIso) - new Date(b.startIso));
 
         const nowTs = nowLocal.getTime();

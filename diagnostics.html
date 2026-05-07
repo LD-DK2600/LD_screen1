@@ -470,19 +470,21 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
       const studiosRaw = studioProbe.chosen?.rows || [];
       const customersRaw = customerProbe.chosen?.rows || [];
       const customerMap = new Map(customersRaw.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
-      const bookingDetailsByBookingId = new Map();
+      // Primær mapping: bookingId -> studioId (fra Booking_Details)
+      const bookingToStudio = new Map();
       bookingDetailsRows.forEach((bd) => {
         const bookingId = pickFirst(bd, ["bookingId", "booking_id", "BookingId"]);
         if (bookingId == null) return;
-        const studioFromDetails = pickFirst(bd, ["studioId", "studio_id", "StudioId", "studioNameSnapshot", "studio_name_snapshot"]);
-        bookingDetailsByBookingId.set(String(bookingId), studioFromDetails);
+        const studioFromDetails =
+          pickFirst(bd, ["studioId", "studio_id", "StudioId"]) ||
+          pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
+        bookingToStudio.set(String(bookingId), studioFromDetails);
       });
 
       const mappedBookings = bookingsRaw.map((booking) => {
         const bookingId = pickFirst(booking, ["id", "bookingId", "booking_id", "BookingId"]);
-        const studioIdRaw =
-          (bookingId != null && bookingDetailsByBookingId.get(String(bookingId))) ||
-          pickFirst(booking, ["studioId", "studio_id", "StudioId", "room_id", "roomId", "studio"]);
+        // Studio kommer via Booking_Details, ikke Booking-tabellen
+        const studioIdRaw = bookingId != null ? bookingToStudio.get(String(bookingId)) : null;
         const studioNameRaw = pickFirst(booking, ["studioName", "studio_name", "roomName", "room_name"]);
         const startRaw = pickFirst(booking, ["startTime", "start_time", "StartTime", "start", "from"]);
         const endRaw = pickFirst(booking, ["endTime", "end_time", "EndTime", "end", "to"]);
@@ -494,7 +496,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
         const room_id =
           canonicalStudioIdFromAny(studioNameRaw) ||
           canonicalStudioIdFromAny(sid) ||
-          (sid ? (sid.toLowerCase().startsWith("studio-") ? sid : `studio-${sid}`) : null);
+          null;
 
         return {
           raw: booking,

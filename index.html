@@ -440,6 +440,7 @@
     const SUPABASE_TABLE_STUDIO = ["Studio", "studio", "Studios", "studios"];
     const SUPABASE_TABLE_BOOKING = ["Booking", "booking", "Bookings", "bookings"];
     const SUPABASE_TABLE_CUSTOMER = ["Customer", "customer", "Customers", "customers"];
+    const SUPABASE_TABLE_BOOKING_DETAILS = ["Booking_Details", "booking_details", "BookingDetails", "bookingdetails"];
     const DEFAULT_STUDIOS = [
       { id: "studio-1", name: "Studie 1" },
       { id: "studio-2", name: "Studie 2" },
@@ -460,6 +461,11 @@
     ].map((f) => `${SLIDESHOW_FOLDER}/${encodeURI(f)}`);
     /** Én klient til hele fanen — undgår "Multiple GoTrueClient instances"-advarslen. */
     let supabaseClientSingleton = null;
+    let allBookingDetailsRows = [];
+    let withParsed = [];
+    let allCustomers = [];
+    let nowTs = Date.now();
+    const EXPECTED_STUDIOS = [1, 2, 3, 4];
 
     function getSupabaseClient() {
       if (!supabaseClientSingleton && window.supabase && typeof window.supabase.createClient === "function") {
@@ -500,19 +506,6 @@
       throw lastErr || new Error(`Ingen af tabellerne virkede: ${candidates.join(", ")}`);
     }
 
-    async function initSupabase() {
-      if (BRUGE_SUPABASE) {
-        try {
-          return await getLiveSupabaseData();
-        } catch (error) {
-          console.error("Supabase fetch failed, using empty studio fallback:", error);
-          return getEmptyStudioState();
-        }
-      } else {
-        return getMock();
-      }
-    }
-
     function pickFirst(obj, keys) {
       if (!obj) return undefined;
       for (let i = 0; i < keys.length; i += 1) {
@@ -543,165 +536,57 @@
       return n ? `studio-${n}` : null;
     }
 
-    async function getLiveSupabaseData() {
+    async function fetchAllData() {
+      if (!BRUGE_SUPABASE) {
+        withParsed = [];
+        allBookingDetailsRows = [];
+        allCustomers = [];
+        renderStudios();
+        return;
+      }
+
       const client = getSupabaseClient();
       if (!client) {
-        throw new Error("Supabase SDK ikke tilgængelig");
+        console.error("Supabase SDK ikke tilgængelig");
+        return;
       }
 
-      let studios = [];
       try {
-        const sr = await supabaseSelectFirstTable(client, SUPABASE_TABLE_STUDIO, "id,name");
-        studios = sr.rows;
-      } catch (e) {
-        if (isMissingTableError(e)) {
-          console.warn("LD_screen1: ingen Studio-tabel fundet — forsætter med bookinger alene:", e.message || e);
-        } else {
-          throw e;
-        }
-      }
-
-      const br = await supabaseSelectFirstTable(client, SUPABASE_TABLE_BOOKING, "*");
-      const bookingsRaw = br.rows;
-
-      let customerNameById = new Map();
-      try {
+        const br = await supabaseSelectFirstTable(client, SUPABASE_TABLE_BOOKING, 'id,"customerId","startTime","endTime","status","title"');
+        const dr = await supabaseSelectFirstTable(client, SUPABASE_TABLE_BOOKING_DETAILS, 'id,"bookingId","studioId","studioNameSnapshot"');
         const cr = await supabaseSelectFirstTable(client, SUPABASE_TABLE_CUSTOMER, "id,name");
-        customerNameById = new Map(cr.rows.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
-      } catch (error) {
-        if (isMissingTableError(error)) {
-          console.warn("LD_screen1: Customer ikke tilgængelig eller andet navn — fortsætter uden lookup.");
-        } else {
-          console.warn("Customer lookup:", error.message || error);
-        }
+
+        const bookings = (br.rows || []).filter((b) => bookingStatusAllowed(pickFirst(b, ["status", "Status"])));
+        allBookingDetailsRows = dr.rows || [];
+        allCustomers = cr.rows || [];
+        const customerById = new Map(allCustomers.map((c) => [String(c.id), c]));
+
+        withParsed = bookings
+          .map((b) => {
+            const startRaw = pickFirst(b, ["startTime", "start_time", "StartTime", "start", "from"]);
+            const endRaw = pickFirst(b, ["endTime", "end_time", "EndTime", "end", "to"]);
+            const customerId = pickFirst(b, ["customerId", "customer_id", "CustomerId"]);
+            if (startRaw == null || endRaw == null) return null;
+            const start = new Date(startRaw);
+            const end = new Date(endRaw);
+            if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) return null;
+            return {
+              raw: b,
+              startIso: start.toISOString(),
+              endIso: end.toISOString(),
+              customer: customerId != null ? customerById.get(String(customerId)) || null : null
+            };
+          })
+          .filter(Boolean);
+
+        renderStudios();
+      } catch (err) {
+        console.error("Data fetch error:", err);
+        allBookingDetailsRows = [];
+        withParsed = [];
+        allCustomers = [];
+        renderStudios();
       }
-
-      const studioIdToCanonical = new Map();
-      const roomsFromStudioTable = (studios || [])
-        .filter((studio) => {
-          const n = (studio.name || "").toLowerCase();
-          return n.includes("studie") || n.includes("studio");
-        })
-        .map((studio) => {
-          const canonical =
-            canonicalStudioIdFromAny(studio.name) ||
-            canonicalStudioIdFromAny(studio.id) ||
-            `studio-${studio.id}`;
-          studioIdToCanonical.set(String(studio.id), canonical);
-          studioIdToCanonical.set(`studio-${studio.id}`, canonical);
-          return {
-            id: canonical,
-            name: studio.name
-          };
-        });
-
-      const bookings = (bookingsRaw || [])
-        .filter((b) => bookingStatusAllowed(pickFirst(b, ["status", "Status"])))
-        .map((booking) => {
-          const studioId = pickFirst(booking, [
-            "studioId",
-            "studio_id",
-            "StudioId",
-            "room_id",
-            "roomId",
-            "studio"
-          ]);
-          const startRaw = pickFirst(booking, ["startTime", "start_time", "StartTime", "start", "from"]);
-          const endRaw = pickFirst(booking, ["endTime", "end_time", "EndTime", "end", "to"]);
-          const customerId = pickFirst(booking, ["customerId", "customer_id", "CustomerId"]);
-          const inlineName = pickFirst(booking, [
-            "customerName",
-            "customer_name",
-            "guestName",
-            "guest_name",
-            "clientName",
-            "client_name"
-          ]);
-
-          if (!studioId || startRaw == null || endRaw == null) {
-            return null;
-          }
-
-          const startDate = new Date(startRaw);
-          const endDate = new Date(endRaw);
-          if (Number.isNaN(startDate.valueOf()) || Number.isNaN(endDate.valueOf())) {
-            return null;
-          }
-
-          const sid = String(studioId).trim();
-          const studioNameInline = pickFirst(booking, ["studioName", "studio_name", "roomName", "room_name"]);
-          const room_id =
-            studioIdToCanonical.get(sid) ||
-            canonicalStudioIdFromAny(sid) ||
-            canonicalStudioIdFromAny(studioNameInline) ||
-            (sid.toLowerCase().startsWith("studio-") ? sid : `studio-${sid}`);
-
-          const lookupName =
-            (customerId != null && customerNameById.get(String(customerId))) || inlineName || null;
-
-          return {
-            room_id,
-            start_time: startDate.toISOString(),
-            end_time: endDate.toISOString(),
-            title: pickFirst(booking, ["title", "name", "subject", "Title"]) || "Booking",
-            customer_name: lookupName || "Ukendt kunde",
-            status: String(pickFirst(booking, ["status", "Status"]) || "").toLowerCase()
-          };
-        })
-        .filter(Boolean);
-
-      bookings.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-
-      const rawCount = (bookingsRaw || []).length;
-      if (rawCount > 0 && bookings.length === 0) {
-        console.warn(
-          "LD_screen1: Hentede",
-          rawCount,
-          "booking-rækker, men ingen kunne bruges. Tjek kolonnenavne (start/slut, studie-id). Eksempel:",
-          bookingsRaw[0]
-        );
-      }
-
-      const roomsById = new Map(DEFAULT_STUDIOS.map((r) => [r.id, { ...r }]));
-      roomsFromStudioTable.forEach((r) => {
-        const n = extractStudioNumber(r.id) || extractStudioNumber(r.name);
-        if (!n) return;
-        roomsById.set(`studio-${n}`, { id: `studio-${n}`, name: `Studie ${n}` });
-      });
-
-      const canonicalRoomSet = new Set([...roomsById.keys()]);
-      const canonicalBookings = bookings.filter((b) => canonicalRoomSet.has(b.room_id));
-      const displayRooms = [...roomsById.values()].sort((a, b) => {
-        const na = extractStudioNumber(a.id) || 99;
-        const nb = extractStudioNumber(b.id) || 99;
-        return na - nb;
-      });
-
-      return { rooms: displayRooms, bookings: canonicalBookings };
-    }
-
-    function getEmptyStudioState() {
-      return { rooms: DEFAULT_STUDIOS, bookings: [] };
-    }
-
-    function getMock() {
-      const now = new Date();
-      const addHours = (date, h) => new Date(date.getTime() + h * 60 * 60 * 1000);
-      const addMinutes = (date, m) => new Date(date.getTime() + m * 60 * 1000);
-
-      const rooms = [
-        { id: "studio-1", name: "Studio 1" },
-        { id: "studio-2", name: "Studio 2" }
-      ];
-
-      const bookings = [
-        { room_id: "studio-1", start_time: addMinutes(now, -30).toISOString(), end_time: addMinutes(now, 30).toISOString(), title: "Session A", status: "occupied" },
-        { room_id: "studio-2", start_time: addHours(now, 1).toISOString(), end_time: addHours(now, 3).toISOString(), title: "Session B", status: "pending" },
-        { room_id: "studio-1", start_time: addHours(now, 2).toISOString(), end_time: addHours(now, 4).toISOString(), title: "Session C", status: "pending" },
-        { room_id: "studio-2", start_time: addMinutes(now, -90).toISOString(), end_time: addMinutes(now, -30).toISOString(), title: "Past Session D", status: "completed" }
-      ];
-
-      return { rooms, bookings };
     }
 
     function fmt(dateString) {
@@ -709,62 +594,88 @@
       return date.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
     }
 
-    async function render() {
-      const { rooms, bookings } = await initSupabase();
+    function renderStudios() {
       const upcomingBookingsList = document.getElementById("upcoming-bookings-list");
+      if (!upcomingBookingsList) return;
       upcomingBookingsList.innerHTML = "";
 
-      const now = new Date();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const todayLocal = new Date();
+      todayLocal.setHours(0, 0, 0, 0);
+      const tomorrowLocal = new Date(todayLocal);
+      tomorrowLocal.setDate(tomorrowLocal.getDate() + 1);
 
-      const relevantBookings = bookings.filter((b) => {
-        const bookingDate = new Date(b.start_time);
-        return bookingDate >= today && bookingDate < tomorrow;
-      });
-
-      rooms.forEach((room) => {
-        const roomBookings = relevantBookings
-          .filter((b) => b.room_id === room.id)
-          .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-
-        const nowTs = now.getTime();
-        const activeNow = roomBookings.find((b) => {
-          const t0 = new Date(b.start_time).getTime();
-          const t1 = new Date(b.end_time).getTime();
-          return t0 <= nowTs && nowTs < t1;
+      const previews = EXPECTED_STUDIOS.map((studioId) => {
+        const sid = `studio-${studioId}`;
+        const studioDetails = allBookingDetailsRows.filter((bd) => {
+          const studioRaw = pickFirst(bd, ["studioId", "studio_id", "StudioId"]);
+          const snapshot = pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
+          return (
+            String(studioRaw) === String(studioId) ||
+            String(studioRaw) === sid ||
+            canonicalStudioIdFromAny(studioRaw) === sid ||
+            canonicalStudioIdFromAny(snapshot) === sid
+          );
         });
 
-        const nextBooking =
-          activeNow ||
-          roomBookings.find((b) => new Date(b.start_time) > nowTs) ||
-          roomBookings.find((b) => new Date(b.end_time) >= nowTs) ||
-          roomBookings[0];
+        const studioBookings = studioDetails
+          .map((bd) => {
+            const bookingId = pickFirst(bd, ["bookingId", "booking_id", "BookingId"]);
+            const booking = withParsed.find((b) => {
+              const rawId = pickFirst(b.raw, ["id", "bookingId", "booking_id", "BookingId"]);
+              return String(rawId) === String(bookingId);
+            });
+            if (!booking) return null;
+            return {
+              ...booking,
+              title: pickFirst(booking.raw, ["title", "name", "subject", "Title"]) || "No title",
+              customerName: booking.customer?.name || "Unknown"
+            };
+          })
+          .filter(Boolean);
+
+        const todayBookings = studioBookings
+          .filter((b) => {
+            const startTs = new Date(b.startIso).getTime();
+            return startTs >= todayLocal.getTime() && startTs < tomorrowLocal.getTime();
+          })
+          .sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
+
+        const activeNow = todayBookings.find((b) => {
+          const startTs = new Date(b.startIso).getTime();
+          const endTs = new Date(b.endIso).getTime();
+          return startTs <= nowTs && nowTs < endTs;
+        }) || null;
+
+        const next = todayBookings.find((b) => new Date(b.startIso).getTime() > nowTs) || null;
+        return { studioId, activeNow, next };
+      });
+
+      previews.forEach((preview) => {
+        const roomName = `Studie ${preview.studioId}`;
+        const booking = preview.activeNow || preview.next;
 
         const card = document.createElement("div");
         card.classList.add("studio-booking-card");
 
-        if (activeNow) {
+        if (preview.activeNow) {
           card.innerHTML = `
-            <div class="studio-booking-title">${room.name}</div>
+            <div class="studio-booking-title">${roomName}</div>
             <div class="studio-booking-line studio-booking-now">I studiet nu</div>
-            <div class="studio-booking-line">${activeNow.customer_name || "Ukendt kunde"}</div>
-            <div class="studio-booking-line">${activeNow.title || "Booking"}</div>
-            <div class="studio-booking-line">${fmt(activeNow.start_time)} – ${fmt(activeNow.end_time)}</div>
+            <div class="studio-booking-line">${booking.customerName || "Ukendt kunde"}</div>
+            <div class="studio-booking-line">${booking.title || "Booking"}</div>
+            <div class="studio-booking-line">${fmt(booking.startIso)} – ${fmt(booking.endIso)}</div>
           `;
-        } else if (nextBooking) {
+        } else if (preview.next) {
           card.innerHTML = `
-            <div class="studio-booking-title">${room.name}</div>
+            <div class="studio-booking-title">${roomName}</div>
             <div class="studio-booking-line">Næste i dag</div>
-            <div class="studio-booking-line">${nextBooking.customer_name || "Ukendt kunde"}</div>
-            <div class="studio-booking-line">${nextBooking.title || "Booking"}</div>
-            <div class="studio-booking-line">${fmt(nextBooking.start_time)} – ${fmt(nextBooking.end_time)}</div>
+            <div class="studio-booking-line">${booking.customerName || "Ukendt kunde"}</div>
+            <div class="studio-booking-line">${booking.title || "Booking"}</div>
+            <div class="studio-booking-line">${fmt(booking.startIso)} – ${fmt(booking.endIso)}</div>
           `;
         } else {
           card.innerHTML = `
-            <div class="studio-booking-title">${room.name}</div>
+            <div class="studio-booking-title">${roomName}</div>
             <div class="studio-booking-line">Ingen bookinger i dag</div>
           `;
         }
@@ -785,9 +696,7 @@
         month: "long",
         day: "numeric"
       });
-
-      render();
-      setTimeout(clock, 1000 * 30);
+      setTimeout(clock, 1000);
     }
 
     async function initSlideshow() {
@@ -971,6 +880,12 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       initSlideshow();
+      fetchAllData();
+      setInterval(fetchAllData, 5 * 60 * 1000);
+      setInterval(() => {
+        nowTs = Date.now();
+        renderStudios();
+      }, 1000);
       clock();
     });
   </script>

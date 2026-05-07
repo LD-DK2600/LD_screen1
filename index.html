@@ -768,6 +768,9 @@
         statusEl.textContent = text;
         statusEl.hidden = false;
       };
+      const hideStatus = () => {
+        statusEl.hidden = true;
+      };
       const setStatusMode = (centered) => {
         if (centered) {
           statusEl.style.top = "50%";
@@ -809,37 +812,44 @@
         return;
       }
 
-      if (isUnifiMonitorShare) {
-        video.hidden = true;
-        embed.hidden = true;
-        openLink.hidden = false;
-        openLink.href = feedUrl;
-        setStatusMode(true);
-        frame.style.background =
-          "linear-gradient(150deg, rgba(32, 44, 70, 0.92), rgba(10, 15, 26, 0.96))";
-        showStatus("Live feed aabnes i ny fane");
-        return;
-      }
-
       if (!looksLikeDirectVideo) {
-        setStatusMode(false);
+        const retryMs = isUnifiMonitorShare ? 20000 : 0;
+        setStatusMode(isUnifiMonitorShare);
         video.hidden = true;
         embed.hidden = false;
         openLink.hidden = false;
         openLink.href = feedUrl;
-        embed.src = feedUrl;
-        showStatus("Indlæser web-feed...");
+        if (isUnifiMonitorShare) {
+          frame.style.background =
+            "linear-gradient(150deg, rgba(32, 44, 70, 0.92), rgba(10, 15, 26, 0.96))";
+        }
 
-        let iframeLoaded = false;
-        embed.addEventListener("load", () => {
-          iframeLoaded = true;
-          hideStatus();
-        }, { once: true });
+        const startAttempt = () => {
+          let iframeLoaded = false;
+          embed.src = `${feedUrl}${feedUrl.includes("?") ? "&" : "?"}embedTry=${Date.now()}`;
+          showStatus("Indlæser web-feed...");
+          embed.addEventListener("load", () => {
+            iframeLoaded = true;
+            hideStatus();
+          }, { once: true });
 
-        setTimeout(() => {
-          if (iframeLoaded) return;
-          showStatus("Web-feed kan ikke indlejres her (browseren blokerer det). Brug knappen 'Aabn feed'.");
-        }, 4500);
+          setTimeout(() => {
+            if (iframeLoaded) return;
+            if (isUnifiMonitorShare) {
+              showStatus("Kunne ikke vise feed i rammen nu. Prøver igen automatisk — eller brug 'Aabn feed'.");
+            } else {
+              showStatus("Web-feed kan ikke indlejres her (browseren blokerer det). Brug knappen 'Aabn feed'.");
+            }
+          }, 4500);
+        };
+
+        startAttempt();
+        if (retryMs > 0) {
+          setInterval(() => {
+            if (document.hidden) return;
+            startAttempt();
+          }, retryMs);
+        }
         return;
       }
 

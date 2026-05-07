@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LD Booking Diagnostics</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a31;
+      --panel-2: #0f172b;
+      --ok: #52d18d;
+      --warn: #ffc857;
+      --err: #ff6f6f;
+      --txt: #e9efff;
+      --muted: #9db0d7;
+      --border: #2b3a5c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      color: var(--txt);
+      background: radial-gradient(140% 100% at 10% -10%, #22345e 0%, transparent 45%), var(--bg);
+    }
+    header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(32, 46, 78, 0.92), rgba(17, 25, 43, 0.95));
+    }
+    h1 { margin: 0; font-size: 24px; }
+    .sub { margin-top: 6px; color: var(--muted); font-size: 14px; }
+    main {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card {
+      grid-column: span 12;
+      background: linear-gradient(180deg, rgba(24, 35, 61, 0.9), rgba(16, 25, 45, 0.92));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .ok { background: rgba(82, 209, 141, 0.18); color: var(--ok); }
+    .warn { background: rgba(255, 200, 87, 0.16); color: var(--warn); }
+    .err { background: rgba(255, 111, 111, 0.16); color: var(--err); }
+    .muted { color: var(--muted); }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: #1a2748;
+      color: var(--txt);
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover { background: #243560; }
+    code.inline {
+      background: #0b1328;
+      border: 1px solid #26385f;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+    pre {
+      margin: 8px 0 0;
+      padding: 10px;
+      background: #090f1f;
+      border: 1px solid #26385f;
+      border-radius: 8px;
+      max-height: 320px;
+      overflow: auto;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    details {
+      margin-top: 8px;
+      border: 1px solid #2a3b64;
+      border-radius: 8px;
+      background: rgba(8, 15, 31, 0.45);
+      padding: 8px;
+    }
+    summary { cursor: pointer; color: #cfe0ff; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid #2a3b64;
+      padding: 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: #d7e4ff; background: #111a35; }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .mini {
+      border: 1px solid #2d406a;
+      background: #0d1630;
+      border-radius: 10px;
+      padding: 8px;
+      min-height: 120px;
+    }
+    .mini h3 { margin: 0 0 8px; font-size: 14px; }
+    @media (max-width: 900px) {
+      .grid-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Supabase Booking Diagnostics</h1>
+    <div class="sub">Kører read-only tests mod Supabase og viser præcis hvor mapping/permissions fejler.</div>
+  </header>
+  <main>
+    <section class="card" id="connCard"></section>
+    <section class="card" id="tableCard"></section>
+    <section class="card" id="rlsCard"></section>
+    <section class="card" id="mappingCard"></section>
+    <section class="card" id="timeCard"></section>
+    <section class="card" id="studioMapCard"></section>
+    <section class="card" id="previewCard"></section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Samme config som index.html (kan justeres her under debugging)
+    const SUPABASE_URL = "https://vvrruinrupnginlkixeq.supabase.co".replace(/\/+$/, "");
+    const SUPABASE_ANON_KEY = "sb_publishable_YbvhilZ2n49AVN1VWZvEuw_1vjQP-mk";
+
+    const BOOKING_CANDIDATES = ["Booking", "booking", "Bookings", "bookings"];
+    const STUDIO_CANDIDATES = ["Studio", "studio", "Studios", "studios"];
+    const CUSTOMER_CANDIDATES = ["Customer", "customer", "Customers", "customers"];
+    const EXPECTED_STUDIOS = ["studio-1", "studio-2", "studio-3", "studio-4"];
+
+    const sqlSnippets = {
+      currentDate: "select current_date, now(), current_setting('TIMEZONE');",
+      bookingSample: "select * from \"Booking\" order by 1 desc limit 10;",
+      studioSample: "select * from \"Studio\" order by 1 asc limit 10;",
+      rlsPolicyHint: [
+        "alter table public.\"Booking\" enable row level security;",
+        "create policy \"booking anon read\" on public.\"Booking\" for select to anon using (true);",
+        "alter table public.\"Studio\" enable row level security;",
+        "create policy \"studio anon read\" on public.\"Studio\" for select to anon using (true);"
+      ].join("\n")
+    };
+
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+
+    function esc(s) {
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function pickFirst(obj, keys) {
+      if (!obj) return undefined;
+      for (const k of keys) {
+        const v = obj[k];
+        if (v !== undefined && v !== null && v !== "") return v;
+      }
+      return undefined;
+    }
+
+    function extractStudioNumber(value) {
+      const s = String(value || "").toLowerCase();
+      const m = s.match(/(?:studie|studio)\s*[-_#:]?\s*(\d{1,2})/i) || s.match(/\b(\d{1,2})\b/);
+      if (!m) return null;
+      const n = Number(m[1]);
+      return Number.isFinite(n) && n >= 1 && n <= 4 ? n : null;
+    }
+
+    function canonicalStudioIdFromAny(value) {
+      const n = extractStudioNumber(value);
+      return n ? `studio-${n}` : null;
+    }
+
+    function looksPermissionError(err) {
+      if (!err) return false;
+      const code = String(err.code || "");
+      const msg = String(err.message || "").toLowerCase();
+      const status = Number(err.status || 0);
+      return status === 401 || status === 403 || code === "42501" || msg.includes("permission denied") || msg.includes("row-level security");
+    }
+
+    function looksMissingTable(err) {
+      if (!err) return false;
+      const code = String(err.code || "");
+      const status = Number(err.status || 0);
+      const msg = String(err.message || "").toLowerCase();
+      return status === 404 || code === "PGRST205" || code === "42P01" || msg.includes("does not exist") || msg.includes("schema cache");
+    }
+
+    function renderCard(el, title, badgeClass, badgeText, bodyHtml) {
+      el.innerHTML = `
+        <h2>${esc(title)} <span class="badge ${badgeClass}">${esc(badgeText)}</span></h2>
+        ${bodyHtml}
+      `;
+    }
+
+    function jsonDetails(title, data) {
+      return `
+        <details>
+          <summary>${esc(title)}</summary>
+          <pre>${esc(JSON.stringify(data, null, 2))}</pre>
+        </details>
+      `;
+    }
+
+    async function probeTable(name) {
+      const { data, error, count } = await client.from(name).select("*", { count: "exact", head: false }).limit(3);
+      return { name, rows: data || [], count: count ?? (Array.isArray(data) ? data.length : 0), error: error || null };
+    }
+
+    async function findFirstWorking(candidates) {
+      const results = [];
+      for (const c of candidates) {
+        const r = await probeTable(c);
+        results.push(r);
+        if (!r.error) return { chosen: r, results };
+        if (looksPermissionError(r.error)) return { chosen: null, results }; // stop early; table exists but blocked
+      }
+      return { chosen: null, results };
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    (async function runDiagnostics() {
+      const connCard = document.getElementById("connCard");
+      const tableCard = document.getElementById("tableCard");
+      const rlsCard = document.getElementById("rlsCard");
+      const mappingCard = document.getElementById("mappingCard");
+      const timeCard = document.getElementById("timeCard");
+      const studioMapCard = document.getElementById("studioMapCard");
+      const previewCard = document.getElementById("previewCard");
+
+      // 1) Supabase connection test
+      let connOk = false;
+      let connMessage = "";
+      try {
+        const { data, error } = await client.auth.getSession();
+        if (error) throw error;
+        connOk = true;
+        connMessage = "Supabase klient initialiseret. auth.getSession() svarer.";
+      } catch (e) {
+        connMessage = `Forbindelsesfejl: ${e.message || e}`;
+      }
+      renderCard(
+        connCard,
+        "1) Supabase-forbindelse",
+        connOk ? "ok" : "err",
+        connOk ? "OK" : "FEJL",
+        `
+          <div class="row">
+            <span class="muted">URL:</span>
+            <code class="inline">${esc(SUPABASE_URL)}</code>
+            <span class="muted">Key sat:</span>
+            <code class="inline">${SUPABASE_ANON_KEY ? "ja" : "nej"}</code>
+          </div>
+          <div>${esc(connMessage)}</div>
+        `
+      );
+
+      // 2) Table discovery
+      const bookingProbe = await findFirstWorking(BOOKING_CANDIDATES);
+      const studioProbe = await findFirstWorking(STUDIO_CANDIDATES);
+      const customerProbe = await findFirstWorking(CUSTOMER_CANDIDATES);
+
+      const tableRows = [bookingProbe.results, studioProbe.results, customerProbe.results]
+        .flat()
+        .map((r) => `
+          <tr>
+            <td>${esc(r.name)}</td>
+            <td>${r.error ? "<span class='err'>fejl</span>" : "<span class='ok'>ok</span>"}</td>
+            <td>${r.error ? esc(r.error.code || r.error.status || "") : esc(r.count)}</td>
+            <td>${r.error ? esc(r.error.message || "") : "Virker"}</td>
+          </tr>
+        `).join("");
+
+      const bookingCols = bookingProbe.chosen?.rows?.[0] ? Object.keys(bookingProbe.chosen.rows[0]) : [];
+      renderCard(
+        tableCard,
+        "2) Tabel-discovery",
+        bookingProbe.chosen && studioProbe.chosen ? "ok" : "warn",
+        bookingProbe.chosen && studioProbe.chosen ? "FUNDEN" : "DELVIST",
+        `
+          <table>
+            <thead><tr><th>Tabel-kandidat</th><th>Status</th><th>Kode/Count</th><th>Detalje</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+          <div class="row">
+            <span class="muted">Valgt booking-tabel:</span>
+            <code class="inline">${esc(bookingProbe.chosen?.name || "ingen")}</code>
+            <span class="muted">Valgt studio-tabel:</span>
+            <code class="inline">${esc(studioProbe.chosen?.name || "ingen")}</code>
+          </div>
+          ${jsonDetails("Booking feltnavne (sample row)", bookingCols)}
+        `
+      );
+
+      // 3) RLS / permission-check
+      const errors = [...bookingProbe.results, ...studioProbe.results, ...customerProbe.results].map((r) => r.error).filter(Boolean);
+      const permissionErrors = errors.filter(looksPermissionError);
+      const missingTableErrors = errors.filter(looksMissingTable);
+
+      renderCard(
+        rlsCard,
+        "3) RLS / Permissions",
+        permissionErrors.length ? "err" : "ok",
+        permissionErrors.length ? "RLS/Permission mulig" : "Ingen tydelig permission-fejl",
+        `
+          <div>Permission-fejl fundet: <code class="inline">${permissionErrors.length}</code></div>
+          <div>Missing-table fejl fundet: <code class="inline">${missingTableErrors.length}</code></div>
+          <div class="row">
+            <button onclick='navigator.clipboard.writeText(${JSON.stringify(sqlSnippets.rlsPolicyHint)})'>Copy RLS SQL-forslag</button>
+          </div>
+          ${jsonDetails("Fejlobjekter", errors)}
+        `
+      );
+
+      // 4) Booking mapping samples
+      const bookingsRaw = bookingProbe.chosen?.rows || [];
+      const studiosRaw = studioProbe.chosen?.rows || [];
+      const customersRaw = customerProbe.chosen?.rows || [];
+      const customerMap = new Map(customersRaw.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
+
+      const mappedBookings = bookingsRaw.map((booking) => {
+        const studioIdRaw = pickFirst(booking, ["studioId", "studio_id", "StudioId", "room_id", "roomId", "studio"]);
+        const studioNameRaw = pickFirst(booking, ["studioName", "studio_name", "roomName", "room_name"]);
+        const startRaw = pickFirst(booking, ["startTime", "start_time", "StartTime", "start", "from"]);
+        const endRaw = pickFirst(booking, ["endTime", "end_time", "EndTime", "end", "to"]);
+        const customerId = pickFirst(booking, ["customerId", "customer_id", "CustomerId"]);
+        const customerNameInline = pickFirst(booking, ["customerName", "customer_name", "guestName", "guest_name", "clientName", "client_name"]);
+        const statusRaw = pickFirst(booking, ["status", "Status"]);
+
+        const sid = String(studioIdRaw || "").trim();
+        const room_id =
+          canonicalStudioIdFromAny(studioNameRaw) ||
+          canonicalStudioIdFromAny(sid) ||
+          (sid ? (sid.toLowerCase().startsWith("studio-") ? sid : `studio-${sid}`) : null);
+
+        return {
+          raw: booking,
+          studioIdRaw,
+          studioNameRaw,
+          room_id,
+          startRaw,
+          endRaw,
+          customer_name: customerMap.get(String(customerId)) || customerNameInline || "Ukendt kunde",
+          title: pickFirst(booking, ["title", "name", "subject", "Title"]) || "Booking",
+          statusRaw
+        };
+      });
+
+      // Filter annullerede/afviste bookinger
+      const activeMappedBookings = mappedBookings.filter((b) => {
+        const status = String(b.statusRaw || "").toLowerCase().trim();
+        const cancelled = [
+          "cancelled",
+          "cancelled_by_admin",
+          "declined",
+          "draft",
+          "rejected",
+          "tentative",
+          "no_show"
+        ];
+        return !cancelled.includes(status);
+      });
+      const filteredOutCount = mappedBookings.length - activeMappedBookings.length;
+
+      const sampleBookings = activeMappedBookings.slice(0, 3);
+      renderCard(
+        mappingCard,
+        "4) Booking feltmapping",
+        activeMappedBookings.length ? "ok" : "warn",
+        activeMappedBookings.length ? "Data fundet" : "Ingen aktive booking-rækker",
+        `
+          <div>Booking-rækker hentet: <code class="inline">${mappedBookings.length}</code></div>
+          <div>Filtreret væk pga status: <code class="inline">${filteredOutCount}</code></div>
+          <div>Aktive efter filter: <code class="inline">${activeMappedBookings.length}</code></div>
+          <div class="row">
+            <button onclick='navigator.clipboard.writeText(${JSON.stringify(sqlSnippets.bookingSample)})'>Copy SQL: booking sample</button>
+            <button onclick='navigator.clipboard.writeText(${JSON.stringify(sqlSnippets.studioSample)})'>Copy SQL: studio sample</button>
+          </div>
+          ${jsonDetails("3 booking samples (raw + mapped)", sampleBookings)}
+        `
+      );
+
+      // 5) Date/time filter diagnostics
+      const nowLocal = new Date();
+      const todayLocal = new Date(nowLocal);
+      todayLocal.setHours(0, 0, 0, 0);
+      const tomorrowLocal = new Date(todayLocal);
+      tomorrowLocal.setDate(tomorrowLocal.getDate() + 1);
+
+      const withParsed = activeMappedBookings.map((b) => {
+        const start = new Date(b.startRaw);
+        const end = new Date(b.endRaw);
+        return { ...b, startIso: start.toISOString(), endIso: end.toISOString(), valid: !Number.isNaN(start) && !Number.isNaN(end) };
+      });
+      const todayCount = withParsed.filter((b) => {
+        const d = new Date(b.startIso);
+        return d >= todayLocal && d < tomorrowLocal;
+      }).length;
+
+      renderCard(
+        timeCard,
+        "5) Dato/tids-filtrering",
+        "warn",
+        "Tjek timezone",
+        `
+          <div>Lokalt now: <code class="inline">${esc(nowLocal.toString())}</code></div>
+          <div>Browser timezone: <code class="inline">${esc(Intl.DateTimeFormat().resolvedOptions().timeZone || "ukendt")}</code></div>
+          <div>Timezone offset (min): <code class="inline">${nowLocal.getTimezoneOffset()}</code></div>
+          <div>"I dag" interval lokalt: <code class="inline">${todayLocal.toISOString()} → ${tomorrowLocal.toISOString()}</code></div>
+          <div>Bookinger total: <code class="inline">${withParsed.length}</code> · I dag: <code class="inline">${todayCount}</code></div>
+          <div class="row">
+            <button onclick='navigator.clipboard.writeText(${JSON.stringify(sqlSnippets.currentDate)})'>Copy SQL: CURRENT_DATE check</button>
+          </div>
+          ${jsonDetails("Parsed time sample", withParsed.slice(0, 5))}
+        `
+      );
+
+      // 6) Studio mapping tests
+      const studioRows = EXPECTED_STUDIOS.map((sid) => {
+        const matches = withParsed.filter((b) => b.room_id === sid).length;
+        return `<tr><td>${sid}</td><td>${matches}</td></tr>`;
+      }).join("");
+      const mismatches = withParsed.filter((b) => !EXPECTED_STUDIOS.includes(String(b.room_id || "")));
+
+      renderCard(
+        studioMapCard,
+        "6) Studio-mapping test",
+        mismatches.length ? "warn" : "ok",
+        mismatches.length ? "Mismatch fundet" : "Match OK",
+        `
+          <table>
+            <thead><tr><th>Forventet studio-id</th><th>Antal bookinger mappet</th></tr></thead>
+            <tbody>${studioRows}</tbody>
+          </table>
+          ${jsonDetails("Raw booking.studioId vs mapped room_id (mismatches)", mismatches.slice(0, 20).map((m) => ({
+            studioIdRaw: m.studioIdRaw,
+            studioNameRaw: m.studioNameRaw,
+            mappedRoomId: m.room_id,
+            title: m.title
+          })))}
+        `
+      );
+
+      // 7) Rendering preview (same logic as production)
+      const todayBookings = withParsed.filter((b) => {
+        const bookingDate = new Date(b.startIso);
+        return bookingDate >= todayLocal && bookingDate < tomorrowLocal;
+      });
+
+      const previews = EXPECTED_STUDIOS.map((sid, i) => {
+        const roomName = `Studie ${i + 1}`;
+        const roomBookings = todayBookings
+          .filter((b) => b.room_id === sid)
+          .sort((a, b) => new Date(a.startIso) - new Date(b.startIso));
+
+        const nowTs = nowLocal.getTime();
+        const activeNow = roomBookings.find((b) => {
+          const t0 = new Date(b.startIso).getTime();
+          const t1 = new Date(b.endIso).getTime();
+          return t0 <= nowTs && nowTs < t1;
+        });
+        const next = activeNow ||
+          roomBookings.find((b) => new Date(b.startIso).getTime() > nowTs) ||
+          roomBookings[0];
+
+        return { roomName, activeNow, next };
+      });
+
+      const previewHtml = previews.map((p) => {
+        if (p.activeNow) {
+          return `
+            <div class="mini">
+              <h3>${esc(p.roomName)}</h3>
+              <div><span class="badge ok">I studiet nu</span></div>
+              <div>${esc(p.activeNow.customer_name || "Ukendt kunde")}</div>
+              <div class="muted">${esc(p.activeNow.title || "Booking")}</div>
+              <div class="muted">${esc(p.activeNow.startIso)} → ${esc(p.activeNow.endIso)}</div>
+            </div>
+          `;
+        }
+        if (p.next) {
+          return `
+            <div class="mini">
+              <h3>${esc(p.roomName)}</h3>
+              <div><span class="badge warn">Næste i dag</span></div>
+              <div>${esc(p.next.customer_name || "Ukendt kunde")}</div>
+              <div class="muted">${esc(p.next.title || "Booking")}</div>
+              <div class="muted">${esc(p.next.startIso)} → ${esc(p.next.endIso)}</div>
+            </div>
+          `;
+        }
+        return `
+          <div class="mini">
+            <h3>${esc(p.roomName)}</h3>
+            <div class="muted">Ingen bookinger i dag</div>
+          </div>
+        `;
+      }).join("");
+
+      renderCard(
+        previewCard,
+        "7) Final rendering preview (4 studiokort)",
+        "ok",
+        "Preview",
+        `<div class="grid-4">${previewHtml}</div>`
+      );
+    })();
+  </script>
+</body>
+</html>
+

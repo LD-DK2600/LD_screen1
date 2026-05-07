@@ -162,18 +162,6 @@
     const CUSTOMER_CANDIDATES = ["Customer", "customer", "Customers", "customers"];
     const EXPECTED_STUDIOS = ["studio-1", "studio-2", "studio-3", "studio-4"];
 
-    const sqlSnippets = {
-      currentDate: "select current_date, now(), current_setting('TIMEZONE');",
-      bookingSample: "select * from \"Booking\" order by 1 desc limit 10;",
-      studioSample: "select * from \"Studio\" order by 1 asc limit 10;",
-      rlsPolicyHint: [
-        "alter table public.\"Booking\" enable row level security;",
-        "create policy \"booking anon read\" on public.\"Booking\" for select to anon using (true);",
-        "alter table public.\"Studio\" enable row level security;",
-        "create policy \"studio anon read\" on public.\"Studio\" for select to anon using (true);"
-      ].join("\n")
-    };
-
     const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
     });
@@ -301,6 +289,19 @@
       const studioProbe = await findFirstWorking(STUDIO_CANDIDATES);
       const customerProbe = await findFirstWorking(CUSTOMER_CANDIDATES);
 
+      // 3) Dynamiske SQL-snippets baseret på faktisk probe-resultat
+      const sqlSnippets = {
+        currentDate: "select current_date, now(), current_setting('TIMEZONE');",
+        bookingSample: `select * from "${bookingProbe.chosen?.name || "Booking"}" order by 1 desc limit 10;`,
+        studioSample: `select * from "${studioProbe.chosen?.name || "Studio"}" order by 1 asc limit 10;`,
+        rlsPolicyHint: bookingProbe.chosen && studioProbe.chosen ? `
+alter table public."${bookingProbe.chosen.name}" enable row level security;
+create policy "booking anon read" on public."${bookingProbe.chosen.name}" for select to anon using (true);
+alter table public."${studioProbe.chosen.name}" enable row level security;
+create policy "studio anon read" on public."${studioProbe.chosen.name}" for select to anon using (true);
+        `.trim() : "⚠️ Kunne ikke generere RLS SQL — tabeller ikke opdaget"
+      };
+
       const tableRows = [bookingProbe.results, studioProbe.results, customerProbe.results]
         .flat()
         .map((r) => `
@@ -337,18 +338,22 @@
       const errors = [...bookingProbe.results, ...studioProbe.results, ...customerProbe.results].map((r) => r.error).filter(Boolean);
       const permissionErrors = errors.filter(looksPermissionError);
       const missingTableErrors = errors.filter(looksMissingTable);
+      const canGenerateRlsSql = !!(bookingProbe.chosen && studioProbe.chosen);
 
       renderCard(
         rlsCard,
         "3) RLS / Permissions",
-        permissionErrors.length ? "err" : "ok",
-        permissionErrors.length ? "RLS/Permission mulig" : "Ingen tydelig permission-fejl",
+        permissionErrors.length ? "err" : (canGenerateRlsSql ? "ok" : "warn"),
+        permissionErrors.length ? "RLS/Permission mulig" : (canGenerateRlsSql ? "Ingen tydelig permission-fejl" : "Tabeller ikke opdaget"),
         `
           <div>Permission-fejl fundet: <code class="inline">${permissionErrors.length}</code></div>
           <div>Missing-table fejl fundet: <code class="inline">${missingTableErrors.length}</code></div>
           <div class="row">
-            <button onclick='navigator.clipboard.writeText(${JSON.stringify(sqlSnippets.rlsPolicyHint)})'>Copy RLS SQL-forslag</button>
+            ${canGenerateRlsSql
+              ? `<button onclick='navigator.clipboard.writeText(${JSON.stringify(sqlSnippets.rlsPolicyHint)})'>Copy RLS SQL-forslag</button>`
+              : `<span class="badge warn">⚠️ Kunne ikke generere RLS SQL — tabeller ikke opdaget</span>`}
           </div>
+          ${!canGenerateRlsSql ? jsonDetails("RLS SQL status", sqlSnippets.rlsPolicyHint) : ""}
           ${jsonDetails("Fejlobjekter", errors)}
         `
       );

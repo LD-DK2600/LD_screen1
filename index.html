@@ -167,6 +167,17 @@
       background: #05070d;
     }
 
+    .video-feed-embed {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      border-radius: 16px;
+      background: #05070d;
+    }
+
     .video-feed-status {
       position: absolute;
       bottom: 0.5vw;
@@ -308,6 +319,10 @@
         border-radius: 14px;
       }
 
+      .video-feed-embed {
+        border-radius: 14px;
+      }
+
       .video-feed-status {
         font-size: 2.2vw;
         bottom: 1.2vw;
@@ -373,6 +388,13 @@
           controls
           preload="none">
         </video>
+        <iframe
+          id="video-feed-embed"
+          class="video-feed-embed"
+          title="Live video feed"
+          referrerpolicy="no-referrer"
+          hidden>
+        </iframe>
         <p class="video-feed-status" id="video-feed-status" hidden></p>
       </div>
     </div>
@@ -401,7 +423,7 @@
       { id: "studio-3", name: "Studie 3" },
       { id: "studio-4", name: "Studie 4" }
     ];
-    const VIDEO_FEED_URL = "rtsps://10.15.10.1:7441/gXSSBBaJdliFVD1N?enableSrtp";
+    const VIDEO_FEED_URL = "https://monitor.ui.com/2198cd0c-0fa1-4a11-a341-4d17ee25cc1e";
     /** Én klient til hele fanen — undgår "Multiple GoTrueClient instances"-advarslen. */
     let supabaseClientSingleton = null;
 
@@ -706,8 +728,9 @@
 
     function initVideoFeed() {
       const video = document.getElementById("video-feed-player");
+      const embed = document.getElementById("video-feed-embed");
       const statusEl = document.getElementById("video-feed-status");
-      if (!video || !statusEl) return;
+      if (!video || !embed || !statusEl) return;
 
       const showStatus = (text) => {
         statusEl.textContent = text;
@@ -720,11 +743,31 @@
         return;
       }
 
+      const lowerUrl = feedUrl.toLowerCase();
+      const looksLikeDirectVideo =
+        lowerUrl.endsWith(".m3u8")
+        || lowerUrl.endsWith(".mp4")
+        || lowerUrl.endsWith(".webm")
+        || lowerUrl.includes(".m3u8?");
+
       if (feedUrl.startsWith("rtsp://") || feedUrl.startsWith("rtsps://")) {
         showStatus("RTSP/RTSPS kan ikke afspilles direkte i browser. Brug HLS (.m3u8), WebRTC eller en gateway.");
         return;
       }
 
+      if (!looksLikeDirectVideo) {
+        video.hidden = true;
+        embed.hidden = false;
+        embed.src = feedUrl;
+        showStatus("Indlæser web-feed...");
+        embed.addEventListener("load", () => {
+          hideStatus();
+        }, { once: true });
+        return;
+      }
+
+      embed.hidden = true;
+      video.hidden = false;
       video.src = feedUrl;
       video.play().catch(() => {
         showStatus("Kunne ikke starte video-feed automatisk.");

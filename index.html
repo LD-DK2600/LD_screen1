@@ -173,9 +173,9 @@
       position: absolute;
       left: 50%;
       top: 50%;
-      width: 194%;
-      height: 194%;
-      transform: translate(-50%, -36%);
+      width: 233%;
+      height: 233%;
+      transform: translate(-50%, -56%);
       border: 0;
       border-radius: 16px;
       background: #05070d;
@@ -418,7 +418,14 @@
           preload="none">
         </video>
         <iframe
-          id="video-feed-embed"
+          id="video-feed-embed-a"
+          class="video-feed-embed"
+          title="Live video feed"
+          referrerpolicy="no-referrer"
+          hidden>
+        </iframe>
+        <iframe
+          id="video-feed-embed-b"
           class="video-feed-embed"
           title="Live video feed"
           referrerpolicy="no-referrer"
@@ -759,10 +766,12 @@
     function initVideoFeed() {
       const frame = document.getElementById("video-feed-frame");
       const video = document.getElementById("video-feed-player");
-      const embed = document.getElementById("video-feed-embed");
+      const embedA = document.getElementById("video-feed-embed-a");
+      const embedB = document.getElementById("video-feed-embed-b");
       const openLink = document.getElementById("video-feed-open");
       const statusEl = document.getElementById("video-feed-status");
-      if (!frame || !video || !embed || !openLink || !statusEl) return;
+      if (!frame || !video || !embedA || !embedB || !openLink || !statusEl) return;
+      const embeds = [embedA, embedB];
 
       const showStatus = (text) => {
         statusEl.textContent = text;
@@ -816,7 +825,6 @@
         const retryMs = isUnifiMonitorShare ? 20000 : 0;
         setStatusMode(isUnifiMonitorShare);
         video.hidden = true;
-        embed.hidden = false;
         openLink.hidden = false;
         openLink.href = feedUrl;
         if (isUnifiMonitorShare) {
@@ -824,36 +832,74 @@
             "linear-gradient(150deg, rgba(32, 44, 70, 0.92), rgba(10, 15, 26, 0.96))";
         }
 
-        const startAttempt = () => {
-          let iframeLoaded = false;
-          embed.src = `${feedUrl}${feedUrl.includes("?") ? "&" : "?"}embedTry=${Date.now()}`;
-          showStatus("Indlæser web-feed...");
-          embed.addEventListener("load", () => {
-            iframeLoaded = true;
-            hideStatus();
-          }, { once: true });
+        let activeEmbedIx = 0;
+        embeds[0].hidden = false;
+        embeds[1].hidden = true;
 
-          setTimeout(() => {
-            if (iframeLoaded) return;
+        const loadInto = (iframe, url) =>
+          new Promise((resolve) => {
+            let done = false;
+            const finish = (ok) => {
+              if (done) return;
+              done = true;
+              iframe.removeEventListener("load", onLoad);
+              resolve(ok);
+            };
+            const onLoad = () => finish(true);
+            iframe.addEventListener("load", onLoad, { once: true });
+            iframe.src = url;
+            setTimeout(() => finish(false), 4500);
+          });
+
+        const attemptSwap = async () => {
+          const standbyIx = 1 - activeEmbedIx;
+          const standby = embeds[standbyIx];
+          const active = embeds[activeEmbedIx];
+
+          standby.hidden = false; // så browseren rent faktisk renderer
+          standby.style.opacity = "0";
+          standby.style.pointerEvents = "none";
+
+          const url = `${feedUrl}${feedUrl.includes("?") ? "&" : "?"}embedTry=${Date.now()}`;
+          showStatus("Indlæser web-feed...");
+          const ok = await loadInto(standby, url);
+
+          if (!ok) {
+            standby.hidden = true;
+            standby.src = "about:blank";
             if (isUnifiMonitorShare) {
-              showStatus("Kunne ikke vise feed i rammen nu. Prøver igen automatisk — eller brug 'Aabn feed'.");
+              showStatus("Feed virker ikke lige nu. Prøver igen automatisk — eller brug 'Aabn feed'.");
             } else {
               showStatus("Web-feed kan ikke indlejres her (browseren blokerer det). Brug knappen 'Aabn feed'.");
             }
-          }, 4500);
+            return;
+          }
+
+          // swap
+          hideStatus();
+          standby.style.opacity = "";
+          standby.style.pointerEvents = "";
+          active.hidden = true;
+          active.src = "about:blank";
+          activeEmbedIx = standbyIx;
         };
 
-        startAttempt();
+        // first attempt (keep previous visible if it was already visible)
+        attemptSwap();
+
         if (retryMs > 0) {
           setInterval(() => {
             if (document.hidden) return;
-            startAttempt();
+            attemptSwap();
           }, retryMs);
         }
         return;
       }
 
-      embed.hidden = true;
+      embeds.forEach((e) => {
+        e.hidden = true;
+        e.src = "about:blank";
+      });
       openLink.hidden = true;
       setStatusMode(false);
       video.hidden = false;

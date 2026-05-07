@@ -159,6 +159,7 @@
     const SUPABASE_ANON_KEY = "sb_publishable_YbvhilZ2n49AVN1VWZvEuw_1vjQP-mk";
 
     const BOOKING_CANDIDATES = ["Booking", "booking", "Bookings", "bookings"];
+    const BOOKING_DETAILS_CANDIDATES = ["Booking_Details", "booking_details", "BookingDetails", "bookingdetails"];
     const STUDIO_CANDIDATES = ["Studio", "studio", "Studios", "studios"];
     const CUSTOMER_CANDIDATES = ["Customer", "customer", "Customers", "customers"];
     const EXPECTED_STUDIOS = ["studio-1", "studio-2", "studio-3", "studio-4"];
@@ -350,6 +351,7 @@
 
       // 2) Table discovery
       const bookingProbe = await findFirstWorking(BOOKING_CANDIDATES);
+      const bookingDetailsProbe = await findFirstWorking(BOOKING_DETAILS_CANDIDATES);
       const studioProbe = await findFirstWorking(STUDIO_CANDIDATES);
       const customerProbe = await findFirstWorking(CUSTOMER_CANDIDATES);
 
@@ -366,7 +368,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
         `.trim() : "⚠️ Kunne ikke generere RLS SQL — tabeller ikke opdaget"
       };
 
-      const tableRows = [bookingProbe.results, studioProbe.results, customerProbe.results]
+      const tableRows = [bookingProbe.results, bookingDetailsProbe.results, studioProbe.results, customerProbe.results]
         .flat()
         .map((r) => `
           <tr>
@@ -378,11 +380,12 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
         `).join("");
 
       const bookingCols = bookingProbe.chosen?.rows?.[0] ? Object.keys(bookingProbe.chosen.rows[0]) : [];
+      const bookingDetailsCols = bookingDetailsProbe.chosen?.rows?.[0] ? Object.keys(bookingDetailsProbe.chosen.rows[0]) : [];
       renderCard(
         tableCard,
         "2) Tabel-discovery",
-        bookingProbe.chosen && studioProbe.chosen ? "ok" : "warn",
-        bookingProbe.chosen && studioProbe.chosen ? "FUNDEN" : "DELVIST",
+        bookingProbe.chosen && bookingDetailsProbe.chosen && studioProbe.chosen ? "ok" : "warn",
+        bookingProbe.chosen && bookingDetailsProbe.chosen && studioProbe.chosen ? "FUNDEN" : "DELVIST",
         `
           <table>
             <thead><tr><th>Tabel-kandidat</th><th>Status</th><th>Kode/Count</th><th>Detalje</th></tr></thead>
@@ -391,10 +394,13 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
           <div class="row">
             <span class="muted">Valgt booking-tabel:</span>
             <code class="inline">${esc(bookingProbe.chosen?.name || "ingen")}</code>
+            <span class="muted">Valgt booking_details-tabel:</span>
+            <code class="inline">${esc(bookingDetailsProbe.chosen?.name || "ingen")}</code>
             <span class="muted">Valgt studio-tabel:</span>
             <code class="inline">${esc(studioProbe.chosen?.name || "ingen")}</code>
           </div>
           ${jsonDetails("Booking feltnavne (sample row)", bookingCols)}
+          ${jsonDetails("Booking_Details feltnavne (sample row)", bookingDetailsCols)}
         `
       );
       diagState.table.status = bookingProbe.chosen && studioProbe.chosen ? "✅ grøn" : "🟡 gul";
@@ -405,7 +411,9 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
       renderSummaryCard();
 
       // 3) RLS / permission-check
-      const errors = [...bookingProbe.results, ...studioProbe.results, ...customerProbe.results].map((r) => r.error).filter(Boolean);
+      const errors = [...bookingProbe.results, ...bookingDetailsProbe.results, ...studioProbe.results, ...customerProbe.results]
+        .map((r) => r.error)
+        .filter(Boolean);
       const permissionErrors = errors.filter(looksPermissionError);
       const missingTableErrors = errors.filter(looksMissingTable);
       const canGenerateRlsSql = !!(bookingProbe.chosen && studioProbe.chosen);
@@ -434,12 +442,23 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
 
       // 4) Booking mapping samples
       const bookingsRaw = bookingProbe.chosen?.rows || [];
+      const bookingDetailsRows = bookingDetailsProbe.chosen?.rows || [];
       const studiosRaw = studioProbe.chosen?.rows || [];
       const customersRaw = customerProbe.chosen?.rows || [];
       const customerMap = new Map(customersRaw.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
+      const bookingDetailsByBookingId = new Map();
+      bookingDetailsRows.forEach((bd) => {
+        const bookingId = pickFirst(bd, ["bookingId", "booking_id", "BookingId"]);
+        if (bookingId == null) return;
+        const studioFromDetails = pickFirst(bd, ["studioId", "studio_id", "StudioId", "studioNameSnapshot", "studio_name_snapshot"]);
+        bookingDetailsByBookingId.set(String(bookingId), studioFromDetails);
+      });
 
       const mappedBookings = bookingsRaw.map((booking) => {
-        const studioIdRaw = pickFirst(booking, ["studioId", "studio_id", "StudioId", "room_id", "roomId", "studio"]);
+        const bookingId = pickFirst(booking, ["id", "bookingId", "booking_id", "BookingId"]);
+        const studioIdRaw =
+          (bookingId != null && bookingDetailsByBookingId.get(String(bookingId))) ||
+          pickFirst(booking, ["studioId", "studio_id", "StudioId", "room_id", "roomId", "studio"]);
         const studioNameRaw = pickFirst(booking, ["studioName", "studio_name", "roomName", "room_name"]);
         const startRaw = pickFirst(booking, ["startTime", "start_time", "StartTime", "start", "from"]);
         const endRaw = pickFirst(booking, ["endTime", "end_time", "EndTime", "end", "to"]);
@@ -490,6 +509,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
         activeMappedBookings.length ? "Data fundet" : "Ingen aktive booking-rækker",
         `
           <div>Booking-rækker hentet: <code class="inline">${mappedBookings.length}</code></div>
+          <div>Booking_Details-rækker hentet: <code class="inline">${bookingDetailsRows.length}</code></div>
           <div>Filtreret væk pga status: <code class="inline">${filteredOutCount}</code></div>
           <div>Aktive efter filter: <code class="inline">${activeMappedBookings.length}</code></div>
           <div class="row">
@@ -497,6 +517,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
             <button onclick='navigator.clipboard.writeText(${JSON.stringify(sqlSnippets.studioSample)})'>Copy SQL: studio sample</button>
           </div>
           ${jsonDetails("3 booking samples (raw + mapped)", sampleBookings)}
+          ${jsonDetails("3 Booking_Details samples (raw)", bookingDetailsRows.slice(0, 3))}
         `
       );
       diagState.mapping.status = activeMappedBookings.length ? "✅ grøn" : "🟡 gul";

@@ -269,6 +269,12 @@
       navigator.clipboard.writeText(text).catch(() => {});
     }
 
+    function fmtTime(value) {
+      const d = new Date(value);
+      if (Number.isNaN(d.valueOf())) return "-";
+      return d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+    }
+
     const diagState = {
       consoleErrors: [],
       conn: { status: "ukendt", text: "" },
@@ -723,7 +729,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
               <div><span class="badge ok">I studiet nu</span></div>
               <div>${esc(p.activeNow.customer_name || "Ukendt kunde")}</div>
               <div class="muted">${esc(p.activeNow.title || "Booking")}</div>
-              <div class="muted">${esc(p.activeNow.startIso)} → ${esc(p.activeNow.endIso)}</div>
+              <div class="muted">${esc(fmtTime(p.activeNow.startIso))} — ${esc(fmtTime(p.activeNow.endIso))}</div>
             </div>
           `;
         }
@@ -734,7 +740,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
               <div><span class="badge warn">Næste i dag</span></div>
               <div>${esc(p.next.customer_name || "Ukendt kunde")}</div>
               <div class="muted">${esc(p.next.title || "Booking")}</div>
-              <div class="muted">${esc(p.next.startIso)} → ${esc(p.next.endIso)}</div>
+              <div class="muted">${esc(fmtTime(p.next.startIso))} — ${esc(fmtTime(p.next.endIso))}</div>
             </div>
           `;
         }

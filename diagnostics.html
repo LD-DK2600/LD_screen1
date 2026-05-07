@@ -480,11 +480,13 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
           pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
         bookingToStudio.set(String(bookingId), studioFromDetails);
       });
+      console.log("[diag] bookingToStudio map:", Array.from(bookingToStudio.entries()).slice(0, 10));
 
       const mappedBookings = bookingsRaw.map((booking) => {
         const bookingId = pickFirst(booking, ["id", "bookingId", "booking_id", "BookingId"]);
         // Studio kommer via Booking_Details, ikke Booking-tabellen
         const studioIdRaw = bookingId != null ? bookingToStudio.get(String(bookingId)) : null;
+        console.log(`[diag] Booking ${String(bookingId)}: studioId=${String(studioIdRaw)}`);
         const studioNameRaw = pickFirst(booking, ["studioName", "studio_name", "roomName", "room_name"]);
         const startRaw = pickFirst(booking, ["startTime", "start_time", "StartTime", "start", "from"]);
         const endRaw = pickFirst(booking, ["endTime", "end_time", "EndTime", "end", "to"]);

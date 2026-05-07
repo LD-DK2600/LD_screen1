@@ -470,16 +470,36 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
       const studiosRaw = studioProbe.chosen?.rows || [];
       const customersRaw = customerProbe.chosen?.rows || [];
       const customerMap = new Map(customersRaw.map((c) => [String(c.id), c.name || "Ukendt kunde"]));
-      // Primær mapping: bookingId -> studioId (fra Booking_Details)
-      const bookingToStudio = new Map();
-      bookingDetailsRows.forEach((bd) => {
-        const bookingId = pickFirst(bd, ["bookingId", "booking_id", "BookingId"]);
-        if (bookingId == null) return;
-        const studioFromDetails =
-          pickFirst(bd, ["studioId", "studio_id", "StudioId"]) ||
-          pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
-        bookingToStudio.set(String(bookingId), studioFromDetails);
-      });
+      // Primær mapping: bookingId -> studioId (fra ALLE Booking_Details rækker)
+      let allBookingDetailsRows = [];
+      try {
+        const bookingDetailsTable = bookingDetailsProbe.chosen?.name || "Booking_Details";
+        const { data: allData, error: allErr } = await client
+          .from(bookingDetailsTable)
+          .select("bookingId, booking_id, BookingId, studioId, studio_id, StudioId, studioNameSnapshot, studio_name_snapshot");
+        if (allErr) {
+          console.warn("[diag] Kunne ikke hente alle Booking_Details rows:", allErr);
+          allBookingDetailsRows = [];
+        } else {
+          allBookingDetailsRows = allData || [];
+        }
+      } catch (e) {
+        console.warn("[diag] Exception ved hentning af alle Booking_Details rows:", e);
+        allBookingDetailsRows = [];
+      }
+
+      const bookingToStudio = new Map(
+        allBookingDetailsRows
+          .map((bd) => {
+            const bookingId = pickFirst(bd, ["bookingId", "booking_id", "BookingId"]);
+            const studioFromDetails =
+              pickFirst(bd, ["studioId", "studio_id", "StudioId"]) ||
+              pickFirst(bd, ["studioNameSnapshot", "studio_name_snapshot"]);
+            return [bookingId != null ? String(bookingId) : null, studioFromDetails];
+          })
+          .filter(([bookingId]) => bookingId != null)
+      );
+      console.log("[diag] Full bookingToStudio map size:", bookingToStudio.size);
       console.log("[diag] bookingToStudio map entries:", Array.from(bookingToStudio.entries()).slice(0, 5));
       console.log("[diag] bookingDetailsRows sample:", bookingDetailsRows.slice(0, 2));
 
@@ -539,7 +559,8 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
         activeMappedBookings.length ? "Data fundet" : "Ingen aktive booking-rækker",
         `
           <div>Booking-rækker hentet: <code class="inline">${mappedBookings.length}</code></div>
-          <div>Booking_Details-rækker hentet: <code class="inline">${bookingDetailsRows.length}</code></div>
+          <div>Booking_Details-rækker hentet (probe): <code class="inline">${bookingDetailsRows.length}</code></div>
+          <div>Booking_Details-rækker hentet (fuld): <code class="inline">${allBookingDetailsRows.length}</code></div>
           <div>Filtreret væk pga status: <code class="inline">${filteredOutCount}</code></div>
           <div>Aktive efter filter: <code class="inline">${activeMappedBookings.length}</code></div>
           <div class="row">

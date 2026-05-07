@@ -476,7 +476,7 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
         const bookingDetailsTable = "Booking_Details";
         const { data: allData, error: allErr } = await client
           .from(bookingDetailsTable)
-          .select("id, bookingId, studioId, studioNameSnapshot");
+          .select('id,"bookingId","studioId","studioNameSnapshot"');
         if (allErr) {
           console.warn("[diag] Kunne ikke hente alle Booking_Details rows:", allErr);
           allBookingDetailsRows = [];

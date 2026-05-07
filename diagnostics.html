@@ -473,10 +473,10 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
       // Primær mapping: bookingId -> studioId (fra ALLE Booking_Details rækker)
       let allBookingDetailsRows = [];
       try {
-        const bookingDetailsTable = bookingDetailsProbe.chosen?.name || "Booking_Details";
+        const bookingDetailsTable = "Booking_Details";
         const { data: allData, error: allErr } = await client
           .from(bookingDetailsTable)
-          .select("bookingId, booking_id, BookingId, studioId, studio_id, StudioId, studioNameSnapshot, studio_name_snapshot");
+          .select("id, bookingId, studioId, studioNameSnapshot");
         if (allErr) {
           console.warn("[diag] Kunne ikke hente alle Booking_Details rows:", allErr);
           allBookingDetailsRows = [];

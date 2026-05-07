@@ -465,7 +465,22 @@ create policy "studio anon read" on public."${studioProbe.chosen.name}" for sele
       renderSummaryCard();
 
       // 4) Booking mapping samples
-      const bookingsRaw = bookingProbe.chosen?.rows || [];
+      let bookingsRaw = [];
+      try {
+        const bookingTable = bookingProbe.chosen?.name || "Booking";
+        const allBookings = await client
+          .from(bookingTable)
+          .select('id,"customerId","startTime","endTime","status","title"');
+        if (allBookings.error) {
+          console.warn("[diag] Kunne ikke hente alle Booking rows:", allBookings.error);
+          bookingsRaw = bookingProbe.chosen?.rows || [];
+        } else {
+          bookingsRaw = allBookings.data || [];
+        }
+      } catch (e) {
+        console.warn("[diag] Exception ved fuld Booking query:", e);
+        bookingsRaw = bookingProbe.chosen?.rows || [];
+      }
       const bookingDetailsRows = bookingDetailsProbe.chosen?.rows || [];
       const studiosRaw = studioProbe.chosen?.rows || [];
       const customersRaw = customerProbe.chosen?.rows || [];

@@ -167,6 +167,10 @@
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
     });
 
+    if (window.location.protocol === "file:") {
+      console.warn("Diagnostics kører via file://. Brug GitHub Pages-URL'en for at undgå CORS/begrænsninger.");
+    }
+
     function esc(s) {
       return String(s)
         .replaceAll("&", "&amp;")

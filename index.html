@@ -780,9 +780,19 @@
         || lowerUrl.endsWith(".mp4")
         || lowerUrl.endsWith(".webm")
         || lowerUrl.includes(".m3u8?");
+      const isUnifiMonitorShare = lowerUrl.includes("monitor.ui.com/");
 
       if (feedUrl.startsWith("rtsp://") || feedUrl.startsWith("rtsps://")) {
         showStatus("RTSP/RTSPS kan ikke afspilles direkte i browser. Brug HLS (.m3u8), WebRTC eller en gateway.");
+        return;
+      }
+
+      if (isUnifiMonitorShare) {
+        video.hidden = true;
+        embed.hidden = true;
+        openLink.hidden = false;
+        openLink.href = feedUrl;
+        showStatus("UniFi share-link kan ikke vises stabilt i denne ramme. Brug 'Aabn feed'.");
         return;
       }
 
